@@ -92,16 +92,48 @@ qa_chain = LLMChain(llm=azure_4o, prompt=PromptTemplate.from_template(prompt_tem
 # FAISS vector index setup
 def load_faiss_indexes():
     base_path = os.getcwd()  # Get the current working directory
+    logger.info(f"Current working directory: {base_path}")
 
     mitsui_path = os.path.join(base_path, 'Faiss_Index_IT Glue', 'Index_Mitsui Chemicals', 'index.faiss')
     northpoint_path = os.path.join(base_path, 'Faiss_Index_IT Glue', 'Index_Northpoint Commercial Finance', 'index.faiss')
 
-    if not os.path.exists(mitsui_path) or not os.path.exists(northpoint_path):
-        raise FileNotFoundError("One or more FAISS index files not found.")
+    logger.info(f"FAISS index paths: Mitsui - {mitsui_path}, Northpoint - {northpoint_path}")
+
+    if not os.path.exists(mitsui_path):
+        logger.error(f"FAISS index file for Mitsui Chemicals not found at {mitsui_path}")
+        raise FileNotFoundError(f"FAISS index file for Mitsui Chemicals not found at {mitsui_path}")
+        
+    if not os.path.exists(northpoint_path):
+        logger.error(f"FAISS index file for Northpoint Commercial Finance not found at {northpoint_path}")
+        raise FileNotFoundError(f"FAISS index file for Northpoint Commercial Finance not found at {northpoint_path}")
+
+    try:
+        mitsui_index = FAISS.load_local(
+            folder_path=os.path.dirname(mitsui_path),
+            index_name='index',
+            embeddings=embeddings,
+            allow_dangerous_deserialization=True
+        )
+        logger.info("Loaded FAISS index for Mitsui Chemicals successfully.")
+    except Exception as e:
+        logger.error(f"Error loading FAISS index for Mitsui Chemicals: {e}")
+        raise
+
+    try:
+        northpoint_index = FAISS.load_local(
+            folder_path=os.path.dirname(northpoint_path),
+            index_name='index',
+            embeddings=embeddings,
+            allow_dangerous_deserialization=True
+        )
+        logger.info("Loaded FAISS index for Northpoint Commercial Finance successfully.")
+    except Exception as e:
+        logger.error(f"Error loading FAISS index for Northpoint Commercial Finance: {e}")
+        raise
 
     return {
-        "Mitsui Chemicals": FAISS.load_local(folder_path=os.path.dirname(mitsui_path), index_name='index', embeddings=embeddings, allow_dangerous_deserialization=True),
-        "Northpoint Commercial Finance": FAISS.load_local(folder_path=os.path.dirname(northpoint_path), index_name='index', embeddings=embeddings, allow_dangerous_deserialization=True)
+        "Mitsui Chemicals": mitsui_index,
+        "Northpoint Commercial Finance": northpoint_index
     }
 
 faiss_indexes = load_faiss_indexes()
