@@ -91,13 +91,28 @@ qa_chain = LLMChain(llm=azure_4o, prompt=PromptTemplate.from_template(prompt_tem
 
 # FAISS vector index setup
 def load_faiss_indexes():
+    base_path = os.getcwd()  # Get the current working directory
+
+    mitsui_path = os.path.join(base_path, 'Faiss_Index_IT Glue', 'Index_Mitsui Chemicals', 'index.faiss')
+    northpoint_path = os.path.join(base_path, 'Faiss_Index_IT Glue', 'Index_Northpoint Commercial Finance', 'index.faiss')
+
+    if not os.path.exists(mitsui_path) or not os.path.exists(northpoint_path):
+        raise FileNotFoundError("One or more FAISS index files not found.")
+
     return {
-        
-        "Mitsui Chemicals": FAISS.load_local(folder_path=r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals",index_name='index',embeddings=embeddings, allow_dangerous_deserialization=True),
-        "Northpoint Commercial Finance": FAISS.load_local(folder_path=r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance", index_name='index', embeddings= embeddings, allow_dangerous_deserialization=True)
+        "Mitsui Chemicals": FAISS.load_local(folder_path=os.path.dirname(mitsui_path), index_name='index', embeddings=embeddings, allow_dangerous_deserialization=True),
+        "Northpoint Commercial Finance": FAISS.load_local(folder_path=os.path.dirname(northpoint_path), index_name='index', embeddings=embeddings, allow_dangerous_deserialization=True)
     }
 
 faiss_indexes = load_faiss_indexes()
+# def load_faiss_indexes():
+#     return {
+        
+#         "Mitsui Chemicals": FAISS.load_local(folder_path=r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals",index_name='index',embeddings=embeddings, allow_dangerous_deserialization=True),
+#         "Northpoint Commercial Finance": FAISS.load_local(folder_path=r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance", index_name='index', embeddings= embeddings, allow_dangerous_deserialization=True)
+#     }
+
+# faiss_indexes = load_faiss_indexes()
 
 # Display the main title
 with st.sidebar:
