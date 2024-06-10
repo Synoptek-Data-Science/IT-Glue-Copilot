@@ -90,7 +90,7 @@ qa_chain = LLMChain(llm=azure_4o, prompt=PromptTemplate.from_template(prompt_tem
 
 # FAISS vector index setup
 base_path = os.getcwd()
-# mitsui_path = os.path.join(base_path, 'Faiss_Index_IT Glue', 'Index_Mitsui Chemicals', 'index.faiss')
+# mitsui_path = os.path.join(base_path, 'Faiss_Index_IT Glue', 'Index_Mitsui Chemicals America', 'index.faiss')
 northpoint_path = os.path.join(base_path, 'Faiss_Index_IT Glue', 'Index_Northpoint Commercial Finance', 'index.faiss')
 
 # mitsui_index = FAISS.load_local(
@@ -108,7 +108,7 @@ northpoint_index = FAISS.load_local(
 )
 
 faiss_indexes = {
-    # "Mitsui Chemicals": mitsui_index,
+    # "Mitsui Chemicals America": mitsui_index,
     "Northpoint Commercial Finance": northpoint_index
 }
 
