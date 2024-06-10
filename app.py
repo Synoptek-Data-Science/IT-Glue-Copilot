@@ -89,7 +89,6 @@ qa_chain = LLMChain(llm=azure_4o, prompt=PromptTemplate.from_template(prompt_tem
 
 def load_faiss_indexes():
     return {
-        
         "Mitsui Chemicals America": FAISS.load_local(folder_path=r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals America",index_name='index',embeddings=embeddings, allow_dangerous_deserialization=True),
         "Northpoint Commercial Finance": FAISS.load_local(folder_path=r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance", index_name='index', embeddings= embeddings, allow_dangerous_deserialization=True)
     }
@@ -112,7 +111,6 @@ with st.sidebar:
         st.info(f"You are now connected to {st.session_state['clientOrg']} Account!")
     else:
         st.warning("Add client name above")
-
 
 # with st.sidebar:
 #     client_names = list(faiss_indexes.keys())
