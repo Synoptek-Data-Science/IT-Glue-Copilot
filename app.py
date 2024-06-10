@@ -1,6 +1,4 @@
-
 # Importing Required Packages
-
 import streamlit as st
 from streamlit_extras.colored_header import colored_header
 from langchain_openai import AzureOpenAIEmbeddings
@@ -48,9 +46,9 @@ def initialize_session_state():
     if 'clientOrg' not in st.session_state:
         st.session_state['clientOrg'] = ''
     if "messages" not in st.session_state:
-        st.session_state["messages"] = [{"role": "assistant", "content": "What you want to know from the IT Glue Copilot?"}]
+        st.session_state["messages"] = [{"role": "assistant", "content": "What do you want to query from IT Glue Copilot?"}]
     if "default_messages" not in st.session_state:
-        st.session_state["default_messages"] = [{"role": "assistant", "content": "What you want to know from the IT Glue Copilot?"}]
+        st.session_state["default_messages"] = [{"role": "assistant", "content": "What do you want to query from IT Glue Copilot?"}]
     logger.info("Initialized session state")
 
 initialize_session_state()
@@ -89,57 +87,8 @@ Answer:
 
 qa_chain = LLMChain(llm=azure_4o, prompt=PromptTemplate.from_template(prompt_template))
 
-# FAISS vector index setup
-# def load_faiss_indexes():
-#     base_path = os.getcwd()  # Get the current working directory
-#     logger.info(f"Current working directory: {base_path}")
-
-#     mitsui_path = os.path.join(base_path, 'Faiss_Index_IT Glue', 'Index_Mitsui Chemicals', 'index.faiss')
-#     northpoint_path = os.path.join(base_path, 'Faiss_Index_IT Glue', 'Index_Northpoint Commercial Finance', 'index.faiss')
-
-#     logger.info(f"FAISS index paths: Mitsui - {mitsui_path}, Northpoint - {northpoint_path}")
-
-#     if not os.path.exists(mitsui_path):
-#         logger.error(f"FAISS index file for Mitsui Chemicals not found at {mitsui_path}")
-#         raise FileNotFoundError(f"FAISS index file for Mitsui Chemicals not found at {mitsui_path}")
-        
-#     if not os.path.exists(northpoint_path):
-#         logger.error(f"FAISS index file for Northpoint Commercial Finance not found at {northpoint_path}")
-#         raise FileNotFoundError(f"FAISS index file for Northpoint Commercial Finance not found at {northpoint_path}")
-
-#     try:
-#         mitsui_index = FAISS.load_local(
-#             folder_path=os.path.dirname(mitsui_path),
-#             index_name='index',
-#             embeddings=embeddings,
-#             allow_dangerous_deserialization=True
-#         )
-#         logger.info("Loaded FAISS index for Mitsui Chemicals successfully.")
-#     except Exception as e:
-#         logger.error(f"Error loading FAISS index for Mitsui Chemicals: {e}")
-#         raise
-
-#     try:
-#         northpoint_index = FAISS.load_local(
-#             folder_path=os.path.dirname(northpoint_path),
-#             index_name='index',
-#             embeddings=embeddings,
-#             allow_dangerous_deserialization=True
-#         )
-#         logger.info("Loaded FAISS index for Northpoint Commercial Finance successfully.")
-#     except Exception as e:
-#         logger.error(f"Error loading FAISS index for Northpoint Commercial Finance: {e}")
-#         raise
-
-#     return {
-#         "Mitsui Chemicals": mitsui_index,
-#         "Northpoint Commercial Finance": northpoint_index
-#     }
-
-# faiss_indexes = load_faiss_indexes()
 def load_faiss_indexes():
     return {
-        
         "Mitsui Chemicals America": FAISS.load_local(folder_path=r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals America",index_name='index',embeddings=embeddings, allow_dangerous_deserialization=True),
         "Northpoint Commercial Finance": FAISS.load_local(folder_path=r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance", index_name='index', embeddings= embeddings, allow_dangerous_deserialization=True)
     }
@@ -153,13 +102,24 @@ colored_header(label="IT Glue Copilot 🤖", description="\n", color_name="viole
 
 # Select Client Org name
 with st.sidebar:
-    client_names = list(faiss_indexes.keys())
-    st.session_state['clientOrg'] = st.selectbox("**Select Accounts Name** 🚩", client_names)
-    if st.session_state['clientOrg']:
+    client_names = ["Select an Account Name"] + list(faiss_indexes.keys())
+    selected_client = st.selectbox("**Select Account Name** 🚩", client_names)
+    st.session_state['clientOrg'] = selected_client
+
+    if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
         st.session_state['vector_store'] = faiss_indexes[st.session_state['clientOrg']]
         st.info(f"You are now connected to {st.session_state['clientOrg']} Account!")
     else:
         st.warning("Add client name above")
+
+# with st.sidebar:
+#     client_names = list(faiss_indexes.keys())
+#     st.session_state['clientOrg'] = st.selectbox("**Select Account Name** 🚩", client_names)
+#     if st.session_state['clientOrg']:
+#         st.session_state['vector_store'] = faiss_indexes[st.session_state['clientOrg']]
+#         st.info(f"You are now connected to {st.session_state['clientOrg']} Account!")
+#     else:
+#         st.warning("Add client name above")
 
 # Setup memory for app
 memory = ConversationBufferMemory(chat_memory=StreamlitChatMessageHistory(key="langchain_messages"), return_messages=True, memory_key="chat_history")
