@@ -289,7 +289,7 @@ Question:
 {question}
 
 Please provide a comprehensive and helpful answer.
-Try to give as much information as you can from the provided information.
+Try to give as much information as you can from the provided information, otherwise keep it minimal.
 
 
 Answer:
@@ -392,12 +392,12 @@ if user_prompt:
                                             st.error("Error decoding and displaying image. Please try again.")
                         except Exception as e:
                             logger.exception("Error during processing: %s", e)
-                            st.error(ERROR_MSG)
+                            st.error(ERROR_MSG) 
         new_ai_message = {"role": "assistant", "content": ai_response}
         st.session_state.messages.append(new_ai_message)
         st.session_state.run_id = cb.traced_runs[0].id
         memory.save_context(input_dict, {"output": ai_response})
-        logger.info("Session state updated and context saved successfully.")ed 
+        logger.info("Session state updated and context saved successfully.")
     except Exception as e:
         logger.exception("Error during the collection of runs or session state update: %s", e)
         st.error(ERROR_MSG)
