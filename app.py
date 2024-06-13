@@ -175,7 +175,7 @@ if st.session_state["authentication_status"]:
     # Display the main title and sidebar content
     with st.sidebar:
         st.image(r"./synoptek.png", width=275)
-    colored_header(label="IT Glue Copilot 🤖", description="\n", color_name="violet-70")
+    colored_header(label="AI Support Assistant 🤖", description="\n", color_name="violet-70")
 
     with st.sidebar:
         client_names = ["Select an Account Name"] + list(faiss_indexes.keys())
