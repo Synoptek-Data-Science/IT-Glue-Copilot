@@ -1,4 +1,4 @@
-#Required Imports 
+#Imports
 import streamlit as st
 import yaml
 import streamlit_authenticator as stauth
@@ -17,7 +17,7 @@ import base64
 import logging
 
 # Set page config
-st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="centered")
 
 # Load config
 with open('config.yaml') as file:
@@ -80,6 +80,10 @@ def initialize_session_state():
         st.session_state.username = None
 
 initialize_session_state()
+
+# Show the title when on the login page
+if st.session_state["authentication_status"] is None:
+    st.title("AI Support Assistant")
 
 # Authentication for App
 name, authentication_status, username = authenticator.login('Login', 'main')
@@ -170,7 +174,7 @@ if st.session_state["authentication_status"]:
 
     # Display the main title and sidebar content
     with st.sidebar:
-        st.image(r"./synoptek.png", width=275)
+        st.image(r"./synoptek.png", width=285)
     colored_header(label="AI Support Assistant 🤖", description="\n", color_name="violet-70")
 
     with st.sidebar:
@@ -179,12 +183,14 @@ if st.session_state["authentication_status"]:
         if selected_client != st.session_state['previous_clientOrg']:
             st.session_state['clientOrg'] = selected_client
             st.session_state['previous_clientOrg'] = selected_client
-            if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
-                st.session_state['vector_store'] = faiss_indexes[st.session_state['clientOrg']]
-                st.session_state["messages"] = list(st.session_state["default_messages"])
-                st.info(f"You are now connected to {st.session_state['clientOrg']} Account!")
-            else:
-                st.warning("Add client name above")
+
+        # Always check and display the warning if no client name is selected
+        if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+            st.session_state['vector_store'] = faiss_indexes[st.session_state['clientOrg']]
+            st.session_state["messages"] = list(st.session_state["default_messages"])
+            st.info(f"You are now connected to {st.session_state['clientOrg']} Account!")
+        else:
+            st.warning("Add client name above")
 
     # Setup memory for app
     memory = ConversationBufferMemory(
@@ -270,13 +276,7 @@ if st.session_state["authentication_status"]:
     
     # Placeholder for logout button and welcome message at the bottom
     with st.sidebar:
-        st.sidebar.write("") #spaces for the logout botton to appear at bottom of sidebar  
-        st.sidebar.write("")  
-        st.sidebar.write("")  
-        st.sidebar.write("")  
-        st.sidebar.write("")  
-        st.sidebar.write("")  
-        st.sidebar.write("")  
+        st.sidebar.markdown("""<div style="height: 18vh;"></div>""", unsafe_allow_html=True)  # Empty space to push content to the bottom
         st.sidebar.markdown(f'## Hello, *{st.session_state["name"]}*')
         authenticator.logout('Logout', 'sidebar')
 

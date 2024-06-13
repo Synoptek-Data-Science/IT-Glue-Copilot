@@ -3,7 +3,7 @@ credentials:
     user:
       email: pchichghare@synoptek.com
       name: User
-      password: $2b$12$aK93RlYQSUYga1FzLnLMSePV.l0h5S79pubZPzQjRExz0zrmTy9bq #$2b$12$mLIRinWCi1Sb2gKuudzaL.K4vyk3mV9uhpsWBVxudUAiWmdRPT.Iy
+      password: $2b$12$aK93RlYQSUYga1FzLnLMSePV.l0h5S79pubZPzQjRExz0zrmTy9bq
 cookie:
   expiry_days: 30
   key: random_signature_key # Must be string
