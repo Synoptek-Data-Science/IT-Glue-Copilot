@@ -174,8 +174,8 @@ if st.session_state["authentication_status"]:
 
     # Display the main title and sidebar content
     with st.sidebar:
-        st.image(r"./synoptek.png", width=285)
-    colored_header(label="AI Support Assistant 🤖", description="\n", color_name="violet-70")
+        st.image(r"./synoptek.png", width=275)
+    colored_header(label="IT Glue Copilot 🤖", description="\n", color_name="violet-70")
 
     with st.sidebar:
         client_names = ["Select an Account Name"] + list(faiss_indexes.keys())
@@ -183,14 +183,12 @@ if st.session_state["authentication_status"]:
         if selected_client != st.session_state['previous_clientOrg']:
             st.session_state['clientOrg'] = selected_client
             st.session_state['previous_clientOrg'] = selected_client
-
-        # Always check and display the warning if no client name is selected
-        if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
-            st.session_state['vector_store'] = faiss_indexes[st.session_state['clientOrg']]
-            st.session_state["messages"] = list(st.session_state["default_messages"])
-            st.info(f"You are now connected to {st.session_state['clientOrg']} Account!")
-        else:
-            st.warning("Add client name above")
+            if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+                st.session_state['vector_store'] = faiss_indexes[st.session_state['clientOrg']]
+                st.session_state["messages"] = list(st.session_state["default_messages"])
+                st.info(f"You are now connected to {st.session_state['clientOrg']} Account!")
+            else:
+                st.warning("Add client name above")
 
     # Setup memory for app
     memory = ConversationBufferMemory(
@@ -281,6 +279,7 @@ if st.session_state["authentication_status"]:
         authenticator.logout('Logout', 'sidebar')
 
 else:
+    # st.title("Welcome to AI Assistant")
     if st.session_state["authentication_status"] == False:
         st.error('Username/password is incorrect')
     elif st.session_state["authentication_status"] == None:
