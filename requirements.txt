@@ -116,3 +116,4 @@ urllib3==2.2.1
 validators==0.28.3
 watchdog==4.0.1
 yarl==1.9.4
+streamlit-authenticator==0.2.3
