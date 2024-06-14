@@ -1,9 +1,13 @@
 credentials:
   usernames:
-    user:
+    admin:
       email: pchichghare@synoptek.com
-      name: User
-      password: $2b$12$Cm2aGvmu1PlkEqk/3rPzz.8I5afHxTyEl6Q/7XzJYbATlGj21IZPq
+      name: Admin
+      password: $2b$12$.XZiG7ol4iOW0NI1ceL.SO9JAxzGJhbB5GPfSrFTxaH6c9zmM4YY.
+    test:
+      email: pchichghare@synoptek.com
+      name: Test
+      password: $2b$12$hM5iN6B4DRM485L3KNrHJ.jEcUgsmkj9I9xURX9MHilfaAnv2XcsG
     scurrie:
       email: scurrie@synoptek.com
       name: Stephen
