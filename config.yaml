@@ -15,7 +15,7 @@ credentials:
     tbritt:
       email: tbritt@synoptek.com
       name: Timothy
-      password: timothy@321
+      password: $2b$12$PkvR/VCervsW.1zAMAhAT.e8M04TIObD9VR2WTOKe7O7ju9ATGt8m
     jcann:
       email: jcann@synoptek.com
       name: Jay
