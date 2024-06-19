@@ -1,95 +1,99 @@
+cookie:
+  expiry_days: 30
+  key: random_signature_key
+  name: random_cookie_name
 credentials:
   usernames:
     admin:
       email: pchichghare@synoptek.com
       name: Admin
       password: $2b$12$.XZiG7ol4iOW0NI1ceL.SO9JAxzGJhbB5GPfSrFTxaH6c9zmM4YY.
-    test:
-      email: pchichghare@synoptek.com
-      name: Test
-      password: $2b$12$hM5iN6B4DRM485L3KNrHJ.jEcUgsmkj9I9xURX9MHilfaAnv2XcsG
-    scurrie:
-      email: scurrie@synoptek.com
-      name: Stephen
-      password: $2b$12$S8ugUVHK.wIqyyDvcCF.D.0dLiTxaCfx8WOVXsxZ1glt6m0ZKjoea
-    tbritt:
-      email: tbritt@synoptek.com
-      name: Timothy
-      password: $2b$12$PkvR/VCervsW.1zAMAhAT.e8M04TIObD9VR2WTOKe7O7ju9ATGt8m
+      totp_secret: 
+    apurohit:
+      email: apurohit@synoptek.com
+      name: Anish
+      password: $2b$12$nFKQMpcr6uQrOwvi8QV/B.NrvDOEpcj1kZRsVHd25y9gT0m/KHNl2
+    awills:
+      email: awills@synoptek.com
+      name: Andrew
+      password: $2b$12$12gcBW9iJg9lLe2bgKEs9.3t.qLI9kPPFZfFFymPvB65rHFaYOEjC
+    chayden:
+      email: chayden@synoptek.com
+      name: Chris
+      password: $2b$12$kDj/N6vDfa8FRyg8FeWS4OFSxWsRpENzkcGV3bULF7.qtRjGbizAi
+    cmccarthy:
+      email: cmccarthy@synoptek.com
+      name: Christopher
+      password: $2b$12$noXmbOJSn.tLpLIGaBwz1.rSS1PqkykDW664LXylOJiXAvXvhTU.G
+    criley:
+      email: criley@synoptek.com
+      name: Chris
+      password: $2b$12$OukUwBntyjWu9HhHvjM3FuVwVnrOLu2plPXqzMWA2A37jeCrOpOTi
+    gfenton:
+      email: gfenton@synoptek.com
+      name: George
+      password: $2b$12$BhVwjHqLktcmqcMMatIeL.2xB4EGjATfLKTQ6kHpsVe3uRR27k7zG
+    hvshah:
+      email: hvshah@synoptek.com
+      name: Hardik
+      password: $2b$12$GPhfkoGMw4UCSDo5hAOPS.aF.84O20xwG8Z7eI425UEk2uvbLvxMa
     jcann:
       email: jcann@synoptek.com
       name: Jay
       password: $2b$12$TsHN2elv8skikJzm46HxwezhnKTE4pHwDS2y0/ZaeG2TVawQMFRRK
+      totp_secret: ''
+    jcarey:
+      email: jcarey@synoptek.com
+      name: Joseph
+      password: $2b$12$fDBp6O7qwB.CPnSZX7yhPuK360mow85djYYs0.4SPlaLAgOt9SMi6
+    mmoffatt:
+      email: mmoffatt@synoptek.com
+      name: Michael
+      password: $2b$12$At8aZpoDfXrxZmOJ0HVpX.Ghn55qK79CXP7gbHXbxf0eRDMdDqkwi
     msanchez:
       email: msanchez@synoptek.com
       name: Miguel
       password: $2b$12$bJ0ube1F7alRDToqyg8DNeQhuJC6FWl.YGAWxGZUMMtCPRzbVxVBu
-    apurohit:
-        email: apurohit@synoptek.com
-        name: Anish
-        password: $2b$12$nFKQMpcr6uQrOwvi8QV/B.NrvDOEpcj1kZRsVHd25y9gT0m/KHNl2
-    gfenton:
-        email: gfenton@synoptek.com
-        name: George
-        password: $2b$12$BhVwjHqLktcmqcMMatIeL.2xB4EGjATfLKTQ6kHpsVe3uRR27k7zG
-    sryan:
-        email: sryan@synoptek.com
-        name: Sean
-        password: $2b$12$KoeXjLDowR2/hTNIBvCQZOIU3G5Oh82cf8L7wTWGLNPxd5CjykHTy
-    pchichghare:
-        email: pchichghare@synoptek.com
-        name: Pawan
-        password: $2b$12$c.rjKVU9kn4Bqtk69bncUOy4xjr/VKp0QdCe/zX2jaTHIYD5Q9XnC
-    cmccarthy:
-        email: cmccarthy@synoptek.com
-        name: Christopher
-        password: $2b$12$noXmbOJSn.tLpLIGaBwz1.rSS1PqkykDW664LXylOJiXAvXvhTU.G
     mthakkar:
-        email: mthakkar@synoptek.com
-        name: Manan
-        password: $2b$12$Wm1dgUKqSZaADrjG6hx7s.dXLZtcyYAqjJqrnw8it1qia00byjeR6
-    criley:
-        email: criley@synoptek.com
-        name: Chris
-        password: $2b$12$OukUwBntyjWu9HhHvjM3FuVwVnrOLu2plPXqzMWA2A37jeCrOpOTi
-    tbecker:
-        email: tbecker@synoptek.com
-        name: Tim
-        password: $2b$12$VhPoHzqhxaAfOfCg6veA7Oy1qKRDH0OwD.DMWNWJk7xkjgvZyq/UO
-    awills:
-        email: awills@synoptek.com
-        name: Andrew
-        password: $2b$12$12gcBW9iJg9lLe2bgKEs9.3t.qLI9kPPFZfFFymPvB65rHFaYOEjC
+      email: mthakkar@synoptek.com
+      name: Manan
+      password: $2b$12$Wm1dgUKqSZaADrjG6hx7s.dXLZtcyYAqjJqrnw8it1qia00byjeR6
     nasingh:
-        email: nasingh@synoptek.com
-        name: Naman
-        password: $2b$12$p2lwHpaa4rwvNA0vCW7NrOzZy4YlD1C/rWxoBAgQnPZton0pQCZ1y
-    chayden:
-        email: chayden@synoptek.com
-        name: Chris
-        password: $2b$12$kDj/N6vDfa8FRyg8FeWS4OFSxWsRpENzkcGV3bULF7.qtRjGbizAi
-    jcarey:
-        email: jcarey@synoptek.com
-        name: Joseph
-        password: $2b$12$fDBp6O7qwB.CPnSZX7yhPuK360mow85djYYs0.4SPlaLAgOt9SMi6
-    hvshah:
-        email: hvshah@synoptek.com
-        name: Hardik
-        password: $2b$12$GPhfkoGMw4UCSDo5hAOPS.aF.84O20xwG8Z7eI425UEk2uvbLvxMa
+      email: nasingh@synoptek.com
+      name: Naman
+      password: $2b$12$p2lwHpaa4rwvNA0vCW7NrOzZy4YlD1C/rWxoBAgQnPZton0pQCZ1y
+      totp_secret: QUBOQP23MOZVHGFLQOKPG2V632RYNVTM
+    pchichghare:
+      email: pchichghare@synoptek.com
+      name: Pawan
+      password: $2b$12$c.rjKVU9kn4Bqtk69bncUOy4xjr/VKp0QdCe/zX2jaTHIYD5Q9XnC
     rroger:
-        email: rroger@synoptek.com
-        name: Rohan
-        password: $2b$12$f6In3ucwA2Wkj4v5inIpKeK7yxwaKu3znEOj.5iZ60pKG5w5ChGwy
-    mmoffatt:
-        email: mmoffatt@synoptek.com
-        name: Michael
-        password: $2b$12$At8aZpoDfXrxZmOJ0HVpX.Ghn55qK79CXP7gbHXbxf0eRDMdDqkwi
+      email: rroger@synoptek.com
+      name: Rohan
+      password: $2b$12$f6In3ucwA2Wkj4v5inIpKeK7yxwaKu3znEOj.5iZ60pKG5w5ChGwy
+    scurrie:
+      email: scurrie@synoptek.com
+      name: Stephen
+      password: $2b$12$S8ugUVHK.wIqyyDvcCF.D.0dLiTxaCfx8WOVXsxZ1glt6m0ZKjoea
+      totp_secret: ''
     sgahlot:
-        email: sgahlot@synoptek.com
-        name: Shubhankar
-        password: $2b$12$t/qaxVS9A2aJEbWy5jK5KukfFxQ9uYzoga7YciOQ9SGKCPkThsKs.
-    
-cookie:
-  expiry_days: 30
-  key: random_signature_key # Must be string
-  name: random_cookie_name
+      email: sgahlot@synoptek.com
+      name: Shubhankar
+      password: $2b$12$t/qaxVS9A2aJEbWy5jK5KukfFxQ9uYzoga7YciOQ9SGKCPkThsKs.
+    sryan:
+      email: sryan@synoptek.com
+      name: Sean
+      password: $2b$12$KoeXjLDowR2/hTNIBvCQZOIU3G5Oh82cf8L7wTWGLNPxd5CjykHTy
+    tbecker:
+      email: tbecker@synoptek.com
+      name: Tim
+      password: $2b$12$VhPoHzqhxaAfOfCg6veA7Oy1qKRDH0OwD.DMWNWJk7xkjgvZyq/UO
+    tbritt:
+      email: tbritt@synoptek.com
+      name: Timothy
+      password: $2b$12$PkvR/VCervsW.1zAMAhAT.e8M04TIObD9VR2WTOKe7O7ju9ATGt8m
+    test:
+      email: pchichghare@synoptek.com
+      name: Test
+      password: $2b$12$hM5iN6B4DRM485L3KNrHJ.jEcUgsmkj9I9xURX9MHilfaAnv2XcsG
+      totp_secret: 
