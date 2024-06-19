@@ -137,8 +137,42 @@ if st.session_state["authentication_status"]:
     azure_qa, azure_resp, azure_4o = azure_openai_setup(azure_openai_api_key, azure_endpoint)
 
     # Prompt template for AI responses
+    # prompt_template = """
+    # Answer the question based only on the following context, which can include text, images and tables:
+    # {context}
+
+    # Question: {question}
+
+    # First, try to answer the user queries from the given information as much as you can.
+    # After trying, If you are using external knowledge other than the information from the index provided, just give a small message that you are using
+
+    # Just return the helpful answer in as precise a manner as possible, keeping to the point.
+    
+    # At the end of your answer, list the documents you used for this information. Do not list the documents for the images or if you haven't returned any information. 
+
+    # Answer:
+    # """
+    # prompt_template = """
+    # Given the following context, which may include text, images, and tables, provide a detailed and accurate answer to the question. Ensure that your response is based solely on the provided information. 
+
+    # Context:
+    # {context}
+
+    # Question:
+    # {question}
+
+    # Please provide a comprehensive and helpful answer. 
+    # Try to give as much information as you can from the provided information, otherwise if you are giving information from your or external to given information, you need tell thats its external/extra information from your side.
+
+
+
+    # At the end of your answer, list the documents you used for this information. Do not list the documents for the images or if you haven't returned any information. Do not always explain the relevant images sections if you think its not relevant to the query the user is aksing for.
+
+    # Answer:
+    # """
+
     prompt_template = """
-    Given the following context, which may include text, images, and tables, provide a detailed and accurate answer to the question. Ensure that your response is based solely on the provided information. 
+    Given the following context, which may include text, images, and tables, provide a detailed and accurate answer to the question. Base your response solely on the provided information unless additional context from external sources is clearly identified as such.
 
     Context:
     {context}
@@ -146,11 +180,15 @@ if st.session_state["authentication_status"]:
     Question:
     {question}
 
-    Please provide a comprehensive and helpful answer.
-    Try to give as much information as you can from the provided information, otherwise keep it minimal.
+    Please provide a comprehensive and helpful answer, focusing on the most relevant information from the provided context. If you include additional information from external sources, clearly indicate that it is extra information.
+
+    At the end of your answer, list the documents for sources used for the information. Avoid discussing images unless they are directly relevant to answering the query.
 
     Answer:
+
+
     """
+    
 
     qa_chain = LLMChain(llm=azure_4o, prompt=PromptTemplate.from_template(prompt_template))
 
