@@ -69,7 +69,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # Load environment variables
-load_dotenv()
+# load_dotenv()
 azure_openai_api_key = os.getenv("OPENAI_API_KEY_AZURE")
 azure_endpoint = os.getenv("OPENAI_ENDPOINT_AZURE")
 logger.info("Environment variables loaded")
@@ -119,8 +119,11 @@ if st.session_state["authentication_status"]:
     if not otp_secret:
         otp_secret = pyotp.random_base32()
         config['credentials']['usernames'][username]['otp_secret'] = otp_secret
-        with open('config.yaml', 'w') as file:
-            yaml.dump(config, file)
+        
+        # Save updated config back to blob storage
+        updated_blob_data = yaml.dump(config)
+        blob_client.upload_blob(updated_blob_data, overwrite=True)
+
         st.session_state['otp_setup_complete'] = False
         st.session_state['show_qr_code'] = True
         logger.info("Generated new OTP secret and set show_qr_code to True")
@@ -136,11 +139,6 @@ if st.session_state["authentication_status"]:
             otp_uri = totp.provisioning_uri(name=user_data['email'], issuer_name="AI Support Assistant")
             qr = qrcode.make(otp_uri)
             qr = qr.resize((200, 200))  # Resize the QR 
-
-            # Commenting out the code to save QR code to user's downloads directory
-            # downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
-            # qr_image_path = os.path.join(downloads_path, f"qr_{username}.png")
-            # qr.save(qr_image_path)
 
             st.image(qr, caption="Scan this QR code with your authenticator app")
 
