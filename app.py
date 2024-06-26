@@ -17,13 +17,32 @@ import base64
 import logging
 import pyotp
 import qrcode
+import io
+
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+import yaml
 
 # Set page config
 st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="centered")
 
-# Load config
-with open('config.yaml') as file:
-    config = yaml.load(file, Loader=SafeLoader)
+# Load configuration
+# Define your connection string and container details
+load_dotenv()
+
+connection_string = os.getenv("BLOB_CONNECTION_STRING")
+container_name = "itgluecopilot"
+blob_name = "config/config.yaml"
+
+# Initialize the BlobServiceClient
+blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+container_client = blob_service_client.get_container_client(container_name)
+
+# Download the blob content to a stream
+blob_client = container_client.get_blob_client(blob_name)
+blob_data = blob_client.download_blob().readall()
+
+# Load the YAML file from the in-memory bytes
+config = yaml.load(io.BytesIO(blob_data), Loader=yaml.SafeLoader)
 
 # Authenticator
 authenticator = stauth.Authenticate(
