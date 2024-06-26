@@ -1,5 +1,5 @@
 venv
 generate_hash.py
 .env
-src
 config.yaml
+src
