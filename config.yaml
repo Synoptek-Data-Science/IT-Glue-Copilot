@@ -7,7 +7,7 @@ credentials:
     admin:
       email: nasingh@synoptek.com
       name: Admin
-      otp_secret: 5HQIQS5ODU5ZASVW5DINUTEWWVUATFRN
+      otp_secret: FRXHDSYA76FI5REY7ZVIQ4UD6SGAPU73
       password: $2b$12$.XZiG7ol4iOW0NI1ceL.SO9JAxzGJhbB5GPfSrFTxaH6c9zmM4YY.
     apurohit:
       email: apurohit@synoptek.com
