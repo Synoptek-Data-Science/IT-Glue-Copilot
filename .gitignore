@@ -1,6 +1,0 @@
-venv
-generate_hash.py
-.env
-config.yaml
-src
-__pycache__
