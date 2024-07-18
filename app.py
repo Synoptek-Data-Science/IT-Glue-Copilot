@@ -1,4 +1,3 @@
-
 import streamlit as st
 import yaml
 import streamlit_authenticator as stauth
@@ -49,7 +48,7 @@ MAX_TOKENS_QA = 4000
 MAX_TOKENS_RESP = 8000
 MAX_TOKENS_4o = 4000
 CACHE_CLEAR_MSG = "Cleared app cache"
-ERROR_MSG = "Connection aborted. Please generate response template again"
+ERROR_MSG = "Connection aborted."
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler()])
@@ -151,12 +150,12 @@ def calculate_similarity_scores(feedback_df, user_prompt):
     
     return feedback_df
 
-def enhance_response_with_feedback(ai_response, feedback_df, similarity_threshold=51):
+def enhance_response_with_feedback(ai_response, feedback_df, similarity_threshold=48):
     filtered_feedback = feedback_df[feedback_df['similarity'] >= similarity_threshold]
     feedback_comments = filtered_feedback['comments'].tolist()
     
     if feedback_comments:
-        enhanced_response = f"{ai_response}\n\nBased on user feedback, considering the following points:\n" + "\n".join(feedback_comments)
+        enhanced_response = f"{ai_response}\n\nBased on user feedback, considering the following points:\n" + "\n".join([f"- {comment}" for comment in feedback_comments])
     else:
         enhanced_response = ai_response
     
@@ -423,10 +422,10 @@ if st.session_state["authentication_status"]:
                                         feedback_df = load_feedback()
                                         feedback_df = calculate_similarity_scores(feedback_df, user_prompt)
                                         feedback_summary = analyze_feedback(feedback_df)
-                                        relevant_feedback_comments = enhance_response_with_feedback("", feedback_df, similarity_threshold=51)
+                                        relevant_feedback_comments = enhance_response_with_feedback("", feedback_df, similarity_threshold=48)
 
                                         initial_response = qa_chain.run({'context': context, 'question': user_prompt})
-                                        st.session_state["ai_response"] = enhance_response_with_feedback(initial_response, feedback_df, similarity_threshold=51)
+                                        st.session_state["ai_response"] = enhance_response_with_feedback(initial_response, feedback_df, similarity_threshold=48)
 
                                         st.write(st.session_state["ai_response"])
                                         logger.info("AI response generated successfully.")
@@ -471,17 +470,15 @@ if st.session_state["authentication_status"]:
         if st.session_state["show_feedback_form"]:
             st.subheader("Feedback")
 
-            smileys = {
-                "😀": 5,
-                "🙂": 4,
-                "😐": 3,
-                "🙁": 2,
-                "😞": 1
+            rating_options = {
+                1: "Inaccurate",
+                2: "Partially Accurate",
+                3: "Accurate"
             }
 
-            cols = st.columns(len(smileys))
-            for i, (smiley, rating) in enumerate(smileys.items()):
-                if cols[i].button(smiley):
+            cols = st.columns(len(rating_options))
+            for idx, (rating, label) in enumerate(rating_options.items()):
+                if cols[idx].button(label):
                     st.session_state["rating"] = rating
 
             st.write(f"Selected Rating: {st.session_state['rating']}")
@@ -490,14 +487,16 @@ if st.session_state["authentication_status"]:
             feedback_submitted = st.button("Submit Feedback")
 
             if feedback_submitted:
+                if not comments:
+                    comments = "No comments"  # Set default value if comments are empty
                 feedback_data = {
                     "conversation_id": st.session_state["conversation_id"],
                     "username": username,
                     "account_name": st.session_state["clientOrg"],
                     "conversation": st.session_state["messages"],
                     "prompt": st.session_state["user_prompt"],
-                    "rating": st.session_state["rating"],
-                    "comments": comments
+                    "rating": st.session_state["rating"],  # Use the selected rating
+                    "comments": comments  # Use the default value if comments were empty
                 }
                 save_feedback(feedback_data)
                 st.session_state["show_feedback_form"] = False
@@ -531,4 +530,3 @@ else:
         st.warning('Please enter your username and password')
 
 logger.info("-------------------------------------------------------------------")
-
