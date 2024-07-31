@@ -1,3 +1,4 @@
+#imports
 import streamlit as st
 import yaml
 import streamlit_authenticator as stauth
@@ -114,7 +115,7 @@ def load_feedback():
         return pd.DataFrame(columns=["conversation_id", "username", "account_name", "prompt", "conversation", "rating", "comments"])
 
 def analyze_feedback(feedback_df):
-    if feedback_df.empty:
+    if (feedback_df.empty):
         return "No feedback available."
 
     avg_rating = feedback_df["rating"].mean()
@@ -268,40 +269,37 @@ if st.session_state["authentication_status"]:
         azure_qa, azure_resp, azure_4o = azure_openai_setup(azure_openai_api_key, azure_endpoint)
 
         prompt_template = """
-        Given the following context, which may include text, images, and tables, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such.
+        ### Instruction ###
+        Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such.
 
-        Context:
+        **Context:**
         {context}
 
-        Question:
+        **Question:**
         {question}
 
-        Give the information as it is given in the document for the steps/process given in the document in as much detail as possible.
-
-        ### Instruction ###
-        1. **Base your response primarily on the provided context.** If you must incorporate any additional information from your general knowledge, clearly indicate it as "External Information" and keep it to a minimum.
-        2. **Be as specific as possible in your response.** Provide detailed and precise information directly related to the query, using the context provided.
-        3. **Validate all information against the provided context.** If any information cannot be validated, clearly state: "This information cannot be validated against the provided context."
-        4. **Clearly separate information derived from the context and external information.** Use headings such as "IT Glue Response" and "External Information" to differentiate them.
-        5. If the context is insufficient, explicitly state: "The provided context does not contain enough information to answer the question."
-        6. **Quantify the accuracy of the information.** Use tags such as "Fully Accurate", "Partially Accurate", or "Inaccurate" based on the validation against the provided context.
-        7. Ensure that the response is comprehensive, concise, and helpful, focusing on the most relevant information from the provided context.
+        ### Guidelines ###
+        1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
+        2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
+        3. **Specificity**: Provide detailed and precise information directly related to the query.
+        4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
+        5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
+        6. **Comprehensive Response**: Ensure that the response is comprehensive, concise, and helpful, focusing on the most relevant information from the provided context.
+        7. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
 
         ### Example ###
 
         #### IT Glue Response ####
         [Your answer based on the given context]
-        - Accuracy: [Fully Accurate / Partially Accurate / Inaccurate]
-        - Explanation: [Provide a brief explanation of why the information is categorized as such]
 
-        #### External Information ####
-        [Additional information, clearly marked as external]
-        - Accuracy: [Fully Accurate / Partially Accurate / Inaccurate]
-        - Explanation: [Provide a brief explanation of why the information is categorized as such]
+        #### Alerts and Escalation Matrix ####
+        [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
+        
+        ### Document Names ###
+        [List of documents and confidence scores (in %) with descending order]
+        
+        **Answer:**
 
-        At the end of your answer, list the documents or sources used for the information. Avoid discussing or showcasing images unless they are directly relevant to answering the query.
-
-        Answer:
         """
 
         qa_chain = LLMChain(llm=azure_4o, prompt=PromptTemplate.from_template(prompt_template))
@@ -332,6 +330,10 @@ if st.session_state["authentication_status"]:
             "Northpoint Commercial Finance": [
                 r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
                 r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
+            ],
+            "iBAS": [
+                r"./Faiss_Index_IT Glue/Index_iBAS/index1",
+                r"./Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
             ]
         }
 
@@ -403,7 +405,7 @@ if st.session_state["authentication_status"]:
                                         st.error("No Account Name Selected")
                                     else:
                                         relevant_docs = search_across_indexes(vector_store, user_prompt)
-
+                                        
                                         context = ""
                                         relevant_images = []
 
@@ -528,5 +530,3 @@ else:
         st.error('Username/password is incorrect')
     elif st.session_state["authentication_status"] == None:
         st.warning('Please enter your username and password')
-
-logger.info("-------------------------------------------------------------------")
