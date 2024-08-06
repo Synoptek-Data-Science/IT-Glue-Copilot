@@ -284,8 +284,7 @@ if st.session_state["authentication_status"]:
         3. **Specificity**: Provide detailed and precise information directly related to the query.
         4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
         5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
-        6. **Comprehensive Response**: Ensure that the response is comprehensive, concise, and helpful, focusing on the most relevant information from the provided context.
-        7. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
+        6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
 
         ### Example ###
 
@@ -342,7 +341,7 @@ if st.session_state["authentication_status"]:
         def search_across_indexes(vector_stores: List[FAISS], query: str):
             all_results = []
             for store in vector_stores:
-                results = store.similarity_search(query)
+                results = store.similarity_search(query, fetch_k= 12, k=3)
                 all_results.extend(results)
             return all_results
 
