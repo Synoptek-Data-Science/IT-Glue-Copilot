@@ -1,174 +1,2460 @@
-#imports
+# # # # # # # # import os
+# # # # # # # # import tempfile
+# # # # # # # # from azure.storage.blob import BlobServiceClient
+# # # # # # # # import streamlit as st
+# # # # # # # # from yaml.loader import SafeLoader
+# # # # # # # # import yaml
+# # # # # # # # from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+# # # # # # # # from langchain.chains import LLMChain
+# # # # # # # # from langchain.prompts import PromptTemplate
+# # # # # # # # from dotenv import load_dotenv
+# # # # # # # # import streamlit_authenticator as stauth
+# # # # # # # # from streamlit_navigation_bar import st_navbar
+# # # # # # # # from azure.storage.blob import BlobServiceClient
+# # # # # # # # import logging
+# # # # # # # # import pyotp
+# # # # # # # # import qrcode
+# # # # # # # # import io
+
+# # # # # # # # from aisupport import run_chatbot, initialize_session_state, load_faiss_indexes
+
+
+# # # # # # # # # Set page configuration
+# # # # # # # # st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide", initial_sidebar_state= "auto")
+
+# # # # # # # # st.markdown(
+# # # # # # # #     """
+# # # # # # # #     <style>
+# # # # # # # #     /* Ensures that the sidebar starts at the top */
+# # # # # # # #     .css-1lcbmhc {
+# # # # # # # #         padding-top: 0px;
+# # # # # # # #     }
+# # # # # # # #     /* Adjusts padding around the sidebar's content */
+# # # # # # # #     .css-1aumxhk {
+# # # # # # # #         padding-top: 0px;
+# # # # # # # #     }
+# # # # # # # #     </style>
+# # # # # # # #     """,
+# # # # # # # #     unsafe_allow_html=True
+# # # # # # # # )
+# # # # # # # # with st.sidebar:
+# # # # # # # #        st.image(r"./synoptek.png", width=275)
+
+# # # # # # # # load_dotenv()
+# # # # # # # # # Load config
+# # # # # # # # connection_string = os.getenv("BLOB_CONNECTION_STRING")
+# # # # # # # # container_name = "itgluecopilot"
+# # # # # # # # blob_name = "config/config.yaml"
+
+# # # # # # # # # BlobServiceClient
+# # # # # # # # blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+# # # # # # # # container_client = blob_service_client.get_container_client(container_name)
+
+# # # # # # # # # Blob content to stream
+# # # # # # # # blob_client = container_client.get_blob_client(blob_name)
+# # # # # # # # blob_data = blob_client.download_blob().readall()
+
+# # # # # # # # # Load the YAML
+# # # # # # # # config = yaml.load(io.BytesIO(blob_data), Loader=SafeLoader)
+
+# # # # # # # # authenticator = stauth.Authenticate(
+# # # # # # # #     config['credentials'],
+# # # # # # # #     config['cookie']['name'],
+# # # # # # # #     config['cookie']['key'],
+# # # # # # # #     config['cookie']['expiry_days'],
+# # # # # # # # )
+
+# # # # # # # # # Configure logging
+# # # # # # # # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler()])
+# # # # # # # # logger = logging.getLogger(__name__)
+
+# # # # # # # # # Load environment variables
+# # # # # # # # load_dotenv()
+# # # # # # # # logger.info("Environment variables loaded")
+
+# # # # # # # # # Initialize session state
+# # # # # # # # initialize_session_state()
+
+# # # # # # # # # Authentication for App
+# # # # # # # # with st.sidebar:
+# # # # # # # #     name, authentication_status, username = authenticator.login('Login', 'main')
+
+# # # # # # # # if st.session_state["authentication_status"]:
+# # # # # # # #     # Check for OTP Secret and Generate if Not Present
+# # # # # # # #     user_data = config['credentials']['usernames'].get(username, {})
+# # # # # # # #     otp_secret = user_data.get('otp_secret', "")
+
+# # # # # # # #     if not otp_secret:
+# # # # # # # #         otp_secret = pyotp.random_base32()
+# # # # # # # #         config['credentials']['usernames'][username]['otp_secret'] = otp_secret
+# # # # # # # #         blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # # # # #         st.session_state['otp_setup_complete'] = False
+# # # # # # # #         st.session_state['show_qr_code'] = True
+# # # # # # # #         logger.info("Generated new OTP secret and set show_qr_code to True for user %s", username)
+# # # # # # # #     else:
+# # # # # # # #         st.session_state['otp_setup_complete'] = True
+
+# # # # # # # #     # Ensure OTP secret is properly handled
+# # # # # # # #     if otp_secret:
+# # # # # # # #         totp = pyotp.TOTP(otp_secret)
+# # # # # # # #         logger.info("Using OTP secret for user %s: %s", username, otp_secret)
+
+# # # # # # # #         if not st.session_state['otp_verified']:
+# # # # # # # #             if st.session_state['show_qr_code']:
+# # # # # # # #                 st.title("Welcome to AI Support Assistant! 👋")
+# # # # # # # #                 otp_uri = totp.provisioning_uri(name=user_data.get('email', ''), issuer_name="AI Support Assistant")
+# # # # # # # #                 qr = qrcode.make(otp_uri)
+# # # # # # # #                 qr = qr.resize((200, 200))
+
+# # # # # # # #                 st.image(qr, caption="Scan this QR code with your authenticator app")
+
+
+# # # # # # # #             st.title("AI Support Assistant")
+# # # # # # # #             otp_input = st.text_input("Enter the OTP from your authenticator app", type="password")
+# # # # # # # #             verify_button_clicked = st.button("Verify OTP")
+
+# # # # # # # #             if verify_button_clicked:
+# # # # # # # #                 if totp.verify(otp_input):
+# # # # # # # #                     st.session_state['otp_verified'] = True
+# # # # # # # #                     st.session_state['show_qr_code'] = False
+# # # # # # # #                     blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # # # # #                     st.experimental_rerun()
+# # # # # # # #                 else:
+# # # # # # # #                     st.error("Invalid OTP. Please try again.")
+# # # # # # # #         else:
+# # # # # # # #             # Load FAISS indexes
+# # # # # # # #             account_indexes = {
+# # # # # # # #                 "Mitsui Chemicals America": [
+# # # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index1",
+# # # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index2_ocr"
+# # # # # # # #                 ],
+# # # # # # # #                 "Northpoint Commercial Finance": [
+# # # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
+# # # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
+# # # # # # # #                 ],
+# # # # # # # #                 "iBAS": [
+# # # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index1",
+# # # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
+# # # # # # # #                 ]
+# # # # # # # #             }
+# # # # # # # #             embeddings = AzureOpenAIEmbeddings(
+# # # # # # # #                 azure_deployment='embeddings-aims',
+# # # # # # # #                 openai_api_version="2024-04-01-preview",
+# # # # # # # #                 azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # # # # #                 api_key=os.getenv("OPENAI_API_KEY_AZURE")
+# # # # # # # #             )
+# # # # # # # #             faiss_indexes = load_faiss_indexes(account_indexes, embeddings, connection_string)
+
+# # # # # # # #             # Navigation and Main Content
+# # # # # # # #             styles = {
+# # # # # # # #                 "span": {
+# # # # # # # #                     "border-radius": "0.1rem",
+# # # # # # # #                     "color": "rgb(49, 51, 63)",
+# # # # # # # #                     "margin": "0 0.125rem",
+# # # # # # # #                     "padding": "0.400rem 0.400rem",
+# # # # # # # #                 },
+# # # # # # # #                 "active": {
+# # # # # # # #                     "background-color": "rgba(255, 255, 255, 0.25)",
+# # # # # # # #                 },
+# # # # # # # #             }
+
+# # # # # # # #             selected = st_navbar(["Home", "Chatbot", "Alerts and Escalation Matrix"],
+# # # # # # # #                                  selected=st.session_state.selected_option, styles=styles)
+
+# # # # # # # #             # --- APP ---
+# # # # # # # #             if selected == "Home":
+# # # # # # # #                 st.write("# Welcome to AI Support Assistant! 👋")
+# # # # # # # #                 st.markdown(
+# # # # # # # #                     """
+# # # # # # # #                     Welcome to our AI Support Assistant. 
+# # # # # # # #                     Use this tool to streamline your support process.
+                    
+# # # # # # # #                     **☝️ Select an option from the navigation bar** to get started!
+
+# # # # # # # #                     Please head to the Chatbot Tab to get started with your queries.
+# # # # # # # #                     """
+# # # # # # # #                 )
+# # # # # # # #                 st.session_state.selected_option = 'Home'
+# # # # # # # #             elif selected == 'Chatbot':
+# # # # # # # #                 qa_chain = LLMChain(llm=AzureChatOpenAI(
+# # # # # # # #                     model_name='gpt-4o',
+# # # # # # # #                     openai_api_key=os.getenv("OPENAI_API_KEY_AZURE"),
+# # # # # # # #                     azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # # # # #                     openai_api_version="2024-04-01-preview",
+# # # # # # # #                     temperature=0,
+# # # # # # # #                     max_tokens=4000,
+# # # # # # # #                     streaming=True,
+# # # # # # # #                     verbose=True,
+# # # # # # # #                     model_kwargs={'seed': 123}
+# # # # # # # #                 ), prompt=PromptTemplate.from_template("""
+# # # # # # # #                 ### Instruction ###
+# # # # # # # #                 Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such. DO NOT PARAPHRASE ANYTHING AND GIVE EXACTLY AS ITS GIVEN IN THE DOCUMENT.
+
+# # # # # # # #                 **Context:**
+# # # # # # # #                 {context}
+
+# # # # # # # #                 **Question:**
+# # # # # # # #                 {question}
+
+# # # # # # # #                 ### Guidelines ###
+# # # # # # # #                 1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
+# # # # # # # #                 2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
+# # # # # # # #                 3. **Specificity**: Provide detailed and precise information directly related to the query.
+# # # # # # # #                 4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
+# # # # # # # #                 5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
+# # # # # # # #                 6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
+
+# # # # # # # #                 ### Example ###
+
+# # # # # # # #                 #### IT Glue Response ####
+# # # # # # # #                 [Your answer based on the given context]
+                                                       
+# # # # # # # #                 ## External Information ##
+# # # # # # # #                 []
+
+# # # # # # # #                 #### Alerts and Escalation Matrix ####
+# # # # # # # #                 [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
+                
+# # # # # # # #                 ### Document Names ###
+# # # # # # # #                 [List of documents and confidence scores (in %) with descending order.] 
+                
+# # # # # # # #                 **Answer:**
+# # # # # # # #                 """))
+# # # # # # # #                 run_chatbot(faiss_indexes, blob_service_client, embeddings, qa_chain)
+# # # # # # # #                 st.session_state.selected_option = 'Chatbot'
+
+# # # # # # # #             elif selected == 'Alerts and Escalation Matrix':
+
+# # # # # # # #                 with st.sidebar:
+# # # # # # # #                     client_names = ["Select an Account Name"] + list(faiss_indexes.keys())
+# # # # # # # #                     selected_client = st.selectbox("**Select Account Name** 🚩", client_names)#, index=client_names.index(st.session_state.get('clientOrg', "Select an Account Name")))
+# # # # # # # #                     if selected_client != st.session_state['previous_clientOrg']:
+# # # # # # # #                         st.session_state['clientOrg'] = selected_client
+# # # # # # # #                         st.session_state['previous_clientOrg'] = selected_client
+# # # # # # # #                         if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# # # # # # # #                             st.info(f"You are now viewing {st.session_state['clientOrg']} Account!")
+# # # # # # # #                         else:
+# # # # # # # #                             st.warning("Please select an account name above.")
+
+# # # # # # # #                 if st.session_state['clientOrg'] == "Mitsui Chemicals America":
+# # # # # # # #                     st.write("# Mitsui Chemicals America Alerts and Escalation Matrix")
+# # # # # # # #                     st.markdown("Instructions specific to Mitsui Chemicals America...")
+# # # # # # # #                 elif st.session_state['clientOrg'] == "Northpoint Commercial Finance":
+# # # # # # # #                     st.write("# Northpoint Commercial Finance Alerts and Escalation Matrix")
+# # # # # # # #                     st.markdown("Instructions specific to Northpoint Commercial Finance...")
+# # # # # # # #                 elif st.session_state['clientOrg'] == "iBAS":
+# # # # # # # #                     st.write("# iBAS Alerts and Escalation Matrix")
+# # # # # # # #                     st.markdown('''Alerts for iBAS or CHCS
+                                
+# # # # # # # #                     iBAS may also be referred to as CHCS or Teleo. The parent company is Teleo, which created the holding company iBAS to contain their acquisition, CHCS.
+
+# # # # # # # #             AS400/TS4300 tape change requests are to be set to P2, and GSSD is to notify the team lead when they are received to be worked.
+
+# # # # # # # #             ***All change requests need to be reviewed in the weekly CAB that CHCS Services hosts on Wednesday mornings at 7:30 a.m. (mountain time). 
+# # # # # # # #             Add the original requester in the description of the CR; Requester: name of requester. Add Paul Miller as approver on the change. 
+# # # # # # # #             Peer approval needs to be done by Tuesday at noon Mountain. Once all CHCS approvals are given, Paul will give the final approval in the CR. 
+# # # # # # # #             Add ticket notes when the change is complete, as that will be audited by CHCS. 
+# # # # # # # #             *** https://synoptek.itglue.com/5000748/docs/11688669#version=published&documentMode=view***
+
+# # # # # # # #             If a call center employee is down, this is an immediate P2, and their client SLAs are impacted.
+# # # # # # # #             End users are primarily east coast US or Noida India, and most work remotely from home.
+# # # # # # # #             Access to work applications is primarily through RDS (Remote Desktop Services).
+
+# # # # # # # #             Documentation is here: https://synoptek.itglue.com/5000748/documents/folder/3025208/
+
+
+# # # # # # # #             Synoptek Support Number:
+# # # # # # # #             US: 877-796-2310
+# # # # # # # #             India: 1800-309-8033
+# # # # # # # #             ***EOC please add ftpservices@chcs-services.com to any FTP server alerts***
+
+# # # # # # # #             Ticket Detail Alert
+# # # # # # # #             iBAS may also be referred to as CHCS or Teleo. The parent company is Teleo, which created the holding company iBAS to contain their acquisition, CHCS. 
+# # # # # # # #             AS400/TS4300 tape change requests are to be set to P2, and GSSD is to notify the team lead when they are received to be worked. 
+# # # # # # # #             ***All change requests need to be reviewed in the weekly CAB that CHCS Services hosts on Wednesday mornings at 7:30 a.m. (mountain time). 
+# # # # # # # #             Add the original requester in the description of the CR; Requester: name of requester. Add Paul Miller as approver on the change. Peer approval needs to be done by Tuesday at noon Mountain. Once all CHCS approvals are given, Paul will give the final approval in the CR. Add ticket notes when the change is complete, as that will be audited by CHCS. *** https://synoptek.itglue.com/5000748/docs/11688669#version=published&documentMode=view If a call center employee is down, this is an immediate P2, and their client SLAs are impacted. End users are primarily east coast US or Noida India, and most work remotely from home. Access to work applications is primarily through RDS (Remote Desktop Services). Documentation is here: https://synoptek.itglue.com/5000748/documents/folder/3025208/ Synoptek Support Number: -US: 877-796-2310 -India: 1800-309-8033 ***EOC please add ftpservices@chcs-services.com to any FTP server alerts***
+
+# # # # # # # #             Customer Deployment Status
+# # # # # # # #             THE CUSTOMER IS CURRENTLY IN DEPLOYMENT WITH TRANSITIONAL SUPPORT. ACTIVE DEPLOY PROJECTS LISTED BELOW:
+# # # # # # # #             No Active Deployment Projects
+# # # # # # # #             Bulletin Board
+# # # # # # # #             No Critical Tickets
+
+
+# # # # # # # #             Support Info	-
+# # # # # # # #             Client Delivery Team-	CDS-Northwest
+# # # # # # # #             Client Advisor-	MICHELLE CARROLL
+# # # # # # # #             Sales Rep	
+# # # # # # # #             Client Delivery Manager- REED, MIKE
+# # # # # # # #             Client Delivery Lead-	REED, MIKE
+                                
+# # # # # # # #             ''')
+# # # # # # # #                     st.markdown('''Escalation Matrix
+                                
+                                
+                                
+# # # # # # # #                                 ''')
+# # # # # # # #                 else:
+# # # # # # # #                     st.write("# Alerts and Escalation Matrix")
+# # # # # # # #                     st.markdown("Please select an account to view the specific Alerts and Escalation Matrix.")
+# # # # # # # #                 st.session_state.selected_option = 'Alerts and Escalation Matrix'
+
+# # # # # # # #             st.sidebar.markdown("""<div style="height: 12vh;"></div>""", unsafe_allow_html=True)
+# # # # # # # #             st.sidebar.markdown(f'## Hello, *{st.session_state["name"]}*')
+# # # # # # # #             if st.sidebar.button("Logout", key="logout_button"):
+# # # # # # # #                 authenticator.logout('Logout', 'sidebar')
+# # # # # # # #                 for key in list(st.session_state.keys()):
+# # # # # # # #                     del st.session_state[key]
+# # # # # # # #                 st.experimental_rerun()
+
+# # # # # # # # elif st.session_state["authentication_status"] == False:
+# # # # # # # #     st.sidebar.error('Username/password is incorrect')
+# # # # # # # # elif st.session_state["authentication_status"] == None:
+# # # # # # # #     st.sidebar.warning('Please enter your username and password')
+
+
+# # # # # # # import os
+# # # # # # # import tempfile
+# # # # # # # from azure.storage.blob import BlobServiceClient
+# # # # # # # import streamlit as st
+# # # # # # # from yaml.loader import SafeLoader
+# # # # # # # import yaml
+# # # # # # # from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+# # # # # # # from langchain.chains import LLMChain
+# # # # # # # from langchain.prompts import PromptTemplate
+# # # # # # # from dotenv import load_dotenv
+# # # # # # # import streamlit_authenticator as stauth
+# # # # # # # from streamlit_navigation_bar import st_navbar
+# # # # # # # import logging
+# # # # # # # import pyotp
+# # # # # # # import qrcode
+# # # # # # # import io
+
+# # # # # # # from aisupport import run_chatbot, initialize_session_state, load_faiss_indexes
+
+# # # # # # # # Set page configuration
+# # # # # # # st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide", initial_sidebar_state="auto")
+
+# # # # # # # st.markdown(
+# # # # # # #     """
+# # # # # # #     <style>
+# # # # # # #     /* Ensures that the sidebar starts at the top */
+# # # # # # #     .css-1lcbmhc {
+# # # # # # #         padding-top: 0px;
+# # # # # # #     }
+# # # # # # #     /* Adjusts padding around the sidebar's content */
+# # # # # # #     .css-1aumxhk {
+# # # # # # #         padding-top: 0px;
+# # # # # # #     }
+# # # # # # #     </style>
+# # # # # # #     """,
+# # # # # # #     unsafe_allow_html=True
+# # # # # # # )
+# # # # # # # with st.sidebar:
+# # # # # # #     st.image(r"./synoptek.png", width=275)
+
+# # # # # # # load_dotenv()
+# # # # # # # # Load config
+# # # # # # # connection_string = os.getenv("BLOB_CONNECTION_STRING")
+# # # # # # # container_name = "itgluecopilot"
+# # # # # # # config_blob_name = "config/config.yaml"
+# # # # # # # accounts_blob_name = "config/accounts.txt"
+
+# # # # # # # # BlobServiceClient
+# # # # # # # blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+# # # # # # # container_client = blob_service_client.get_container_client(container_name)
+
+# # # # # # # # Load the YAML configuration file
+# # # # # # # blob_client = container_client.get_blob_client(config_blob_name)
+# # # # # # # blob_data = blob_client.download_blob().readall()
+# # # # # # # config = yaml.load(io.BytesIO(blob_data), Loader=SafeLoader)
+
+# # # # # # # authenticator = stauth.Authenticate(
+# # # # # # #     config['credentials'],
+# # # # # # #     config['cookie']['name'],
+# # # # # # #     config['cookie']['key'],
+# # # # # # #     config['cookie']['expiry_days'],
+# # # # # # # )
+
+# # # # # # # # Configure logging
+# # # # # # # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler()])
+# # # # # # # logger = logging.getLogger(__name__)
+
+# # # # # # # # Load environment variables
+# # # # # # # load_dotenv()
+# # # # # # # logger.info("Environment variables loaded")
+
+# # # # # # # # Initialize session state
+# # # # # # # initialize_session_state()
+
+# # # # # # # # Authentication for App
+# # # # # # # with st.sidebar:
+# # # # # # #     name, authentication_status, username = authenticator.login('Login', 'main')
+
+# # # # # # # def load_content_from_blob(blob_service_client, container_name, account_name, content_type):
+# # # # # # #     """Load specific content from a .txt file in Azure Blob Storage based on the account name and content type."""
+# # # # # # #     blob_name = f"Documents/{account_name}/{content_type}.txt"
+
+# # # # # # #     try:
+# # # # # # #         blob_client = blob_service_client.get_blob_client(container_name, blob_name)
+# # # # # # #         blob_data = blob_client.download_blob().readall().decode('utf-8')
+# # # # # # #         return blob_data
+# # # # # # #     except Exception as e:
+# # # # # # #         logger.error(f"Error loading {content_type} for {account_name}: {e}")
+# # # # # # #         return f"Error loading {content_type} content for {account_name}."
+
+# # # # # # # if st.session_state["authentication_status"]:
+# # # # # # #     # Load account names dynamically from the blob
+# # # # # # #     account_names = ["Mitsui Chemicals America", "Northpoint Commercial Finance", "iBAS"]
+
+# # # # # # #     # Check for OTP Secret and Generate if Not Present
+# # # # # # #     user_data = config['credentials']['usernames'].get(username, {})
+# # # # # # #     otp_secret = user_data.get('otp_secret', "")
+
+# # # # # # #     if not otp_secret:
+# # # # # # #         otp_secret = pyotp.random_base32()
+# # # # # # #         config['credentials']['usernames'][username]['otp_secret'] = otp_secret
+# # # # # # #         blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # # # #         st.session_state['otp_setup_complete'] = False
+# # # # # # #         st.session_state['show_qr_code'] = True
+# # # # # # #         logger.info("Generated new OTP secret and set show_qr_code to True for user %s", username)
+# # # # # # #     else:
+# # # # # # #         st.session_state['otp_setup_complete'] = True
+
+# # # # # # #     # Ensure OTP secret is properly handled
+# # # # # # #     if otp_secret:
+# # # # # # #         totp = pyotp.TOTP(otp_secret)
+# # # # # # #         logger.info("Using OTP secret for user %s: %s", username, otp_secret)
+
+# # # # # # #         if not st.session_state['otp_verified']:
+# # # # # # #             if st.session_state['show_qr_code']:
+# # # # # # #                 st.title("Welcome to AI Support Assistant! 👋")
+# # # # # # #                 otp_uri = totp.provisioning_uri(name=user_data.get('email', ''), issuer_name="AI Support Assistant")
+# # # # # # #                 qr = qrcode.make(otp_uri)
+# # # # # # #                 qr = qr.resize((200, 200))
+
+# # # # # # #                 st.image(qr, caption="Scan this QR code with your authenticator app")
+
+# # # # # # #             st.title("AI Support Assistant")
+# # # # # # #             otp_input = st.text_input("Enter the OTP from your authenticator app", type="password")
+# # # # # # #             verify_button_clicked = st.button("Verify OTP")
+
+# # # # # # #             if verify_button_clicked:
+# # # # # # #                 if totp.verify(otp_input):
+# # # # # # #                     st.session_state['otp_verified'] = True
+# # # # # # #                     st.session_state['show_qr_code'] = False
+# # # # # # #                     blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # # # #                     st.experimental_rerun()
+# # # # # # #                 else:
+# # # # # # #                     st.error("Invalid OTP. Please try again.")
+# # # # # # #         else:
+# # # # # # #             # Load FAISS indexes
+# # # # # # #             account_indexes = {
+# # # # # # #                 "Mitsui Chemicals America": [
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index1",
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index2_ocr"
+# # # # # # #                 ],
+# # # # # # #                 "Northpoint Commercial Finance": [
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
+# # # # # # #                 ],
+# # # # # # #                 "iBAS": [
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index1",
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
+# # # # # # #                 ]
+# # # # # # #             }
+# # # # # # #             embeddings = AzureOpenAIEmbeddings(
+# # # # # # #                 azure_deployment='embeddings-aims',
+# # # # # # #                 openai_api_version="2024-04-01-preview",
+# # # # # # #                 azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # # # #                 api_key=os.getenv("OPENAI_API_KEY_AZURE")
+# # # # # # #             )
+# # # # # # #             faiss_indexes = load_faiss_indexes(account_indexes, embeddings, connection_string)
+
+# # # # # # #             # Navigation and Main Content
+# # # # # # #             styles = {
+# # # # # # #                 "span": {
+# # # # # # #                     "border-radius": "0.1rem",
+# # # # # # #                     "color": "rgb(49, 51, 63)",
+# # # # # # #                     "margin": "0 0.125rem",
+# # # # # # #                     "padding": "0.400rem 0.400rem",
+# # # # # # #                 },
+# # # # # # #                 "active": {
+# # # # # # #                     "background-color": "rgba(255, 255, 255, 0.25)",
+# # # # # # #                 },
+# # # # # # #             }
+
+# # # # # # #             selected = st_navbar(["Home", "Chatbot", "Alerts and Escalation Matrix"],
+# # # # # # #                                  selected=st.session_state.selected_option, styles=styles)
+
+# # # # # # #             # --- APP ---
+# # # # # # #             if selected == "Home":
+# # # # # # #                 st.write("# Welcome to AI Support Assistant! 👋")
+# # # # # # #                 st.markdown(
+# # # # # # #                     """
+# # # # # # #                     Welcome to our AI Support Assistant. 
+# # # # # # #                     Use this tool to streamline your support process.
+                    
+# # # # # # #                     **☝️ Select an option from the navigation bar** to get started!
+
+# # # # # # #                     Please head to the Chatbot Tab to get started with your queries.
+# # # # # # #                     """
+# # # # # # #                 )
+# # # # # # #                 st.session_state.selected_option = 'Home'
+# # # # # # #             elif selected == 'Chatbot':
+# # # # # # #                 qa_chain = LLMChain(llm=AzureChatOpenAI(
+# # # # # # #                     model_name='gpt-4o',
+# # # # # # #                     openai_api_key=os.getenv("OPENAI_API_KEY_AZURE"),
+# # # # # # #                     azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # # # #                     openai_api_version="2024-04-01-preview",
+# # # # # # #                     temperature=0,
+# # # # # # #                     max_tokens=4000,
+# # # # # # #                     streaming=True,
+# # # # # # #                     verbose=True,
+# # # # # # #                     model_kwargs={'seed': 123}
+# # # # # # #                 ), prompt=PromptTemplate.from_template("""
+# # # # # # #                 ### Instruction ###
+# # # # # # #                 Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such. DO NOT PARAPHRASE ANYTHING AND GIVE EXACTLY AS ITS GIVEN IN THE DOCUMENT.
+
+# # # # # # #                 **Context:**
+# # # # # # #                 {context}
+
+# # # # # # #                 **Question:**
+# # # # # # #                 {question}
+
+# # # # # # #                 ### Guidelines ###
+# # # # # # #                 1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
+# # # # # # #                 2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
+# # # # # # #                 3. **Specificity**: Provide detailed and precise information directly related to the query.
+# # # # # # #                 4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
+# # # # # # #                 5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
+# # # # # # #                 6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
+
+# # # # # # #                 ### Example ###
+
+# # # # # # #                 #### IT Glue Response ####
+# # # # # # #                 [Your answer based on the given context]
+                                                       
+# # # # # # #                 ## External Information ##
+# # # # # # #                 []
+
+# # # # # # #                 #### Alerts and Escalation Matrix ####
+# # # # # # #                 [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
+                
+# # # # # # #                 ### Document Names ###
+# # # # # # #                 [List of documents and confidence scores (in %) with descending order.] 
+                
+# # # # # # #                 **Answer:**
+# # # # # # #                 """))
+# # # # # # #                 run_chatbot(faiss_indexes, blob_service_client, embeddings, qa_chain)
+# # # # # # #                 st.session_state.selected_option = 'Chatbot'
+
+# # # # # # #             elif selected == 'Alerts and Escalation Matrix':
+
+# # # # # # #                 with st.sidebar:
+# # # # # # #                     client_names = ["Select an Account Name"] + account_names
+# # # # # # #                     selected_client = st.selectbox("**Select Account Name** 🚩", client_names)
+# # # # # # #                     if selected_client != st.session_state['previous_clientOrg']:
+# # # # # # #                         st.session_state['clientOrg'] = selected_client
+# # # # # # #                         st.session_state['previous_clientOrg'] = selected_client
+# # # # # # #                         if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# # # # # # #                             st.info(f"You are now viewing {st.session_state['clientOrg']} Account!")
+# # # # # # #                             alerts_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "alerts")
+# # # # # # #                             escalation_matrix_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "escalation_matrix")
+
+# # # # # # #                             st.markdown("### Alerts")
+# # # # # # #                             st.markdown(alerts_content)
+
+# # # # # # #                             st.markdown("### Escalation Matrix")
+# # # # # # #                             st.markdown(escalation_matrix_content)
+# # # # # # #                         else:
+# # # # # # #                             st.warning("Please select an account name above.")
+
+# # # # # # #             st.sidebar.markdown("""<div style="height: 12vh;"></div>""", unsafe_allow_html=True)
+# # # # # # #             st.sidebar.markdown(f'## Hello, *{st.session_state["name"]}*')
+# # # # # # #             if st.sidebar.button("Logout", key="logout_button"):
+# # # # # # #                 authenticator.logout('Logout', 'sidebar')
+# # # # # # #                 for key in list(st.session_state.keys()):
+# # # # # # #                     del st.session_state[key]
+# # # # # # #                 st.experimental_rerun()
+
+# # # # # # # elif st.session_state["authentication_status"] == False:
+# # # # # # #     st.sidebar.error('Username/password is incorrect')
+# # # # # # # elif st.session_state["authentication_status"] == None:
+# # # # # # #     st.sidebar.warning('Please enter your username and password')
+
+
+
+# # # # # # # import os
+# # # # # # # from azure.storage.blob import BlobServiceClient
+# # # # # # # import streamlit as st
+# # # # # # # from yaml.loader import SafeLoader
+# # # # # # # import yaml
+# # # # # # # from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+# # # # # # # from langchain.chains import LLMChain
+# # # # # # # from langchain.prompts import PromptTemplate
+# # # # # # # from dotenv import load_dotenv
+# # # # # # # import streamlit_authenticator as stauth
+# # # # # # # from streamlit_navigation_bar import st_navbar
+# # # # # # # import logging
+# # # # # # # import pyotp
+# # # # # # # import qrcode
+# # # # # # # import io
+
+# # # # # # # from aisupport import run_chatbot, initialize_session_state, load_faiss_indexes
+
+# # # # # # # # Set page configuration
+# # # # # # # st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide", initial_sidebar_state="auto")
+
+# # # # # # # st.markdown(
+# # # # # # #     """
+# # # # # # #     <style>
+# # # # # # #     /* Ensures that the sidebar starts at the top */
+# # # # # # #     .css-1lcbmhc {
+# # # # # # #         padding-top: 0px;
+# # # # # # #     }
+# # # # # # #     /* Adjusts padding around the sidebar's content */
+# # # # # # #     .css-1aumxhk {
+# # # # # # #         padding-top: 0px;
+# # # # # # #     }
+# # # # # # #     </style>
+# # # # # # #     """,
+# # # # # # #     unsafe_allow_html=True
+# # # # # # # )
+# # # # # # # with st.sidebar:
+# # # # # # #     st.image(r"./synoptek.png", width=275)
+
+# # # # # # # load_dotenv()
+# # # # # # # # Load config
+# # # # # # # connection_string = os.getenv("BLOB_CONNECTION_STRING")
+# # # # # # # container_name = "itgluecopilot"
+# # # # # # # config_blob_name = "config/config.yaml"
+# # # # # # # accounts_blob_name = "config/accounts.txt"
+
+# # # # # # # # BlobServiceClient
+# # # # # # # blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+# # # # # # # container_client = blob_service_client.get_container_client(container_name)
+
+# # # # # # # # Load the YAML configuration file
+# # # # # # # blob_client = container_client.get_blob_client(config_blob_name)
+# # # # # # # blob_data = blob_client.download_blob().readall()
+# # # # # # # config = yaml.load(io.BytesIO(blob_data), Loader=SafeLoader)
+
+# # # # # # # authenticator = stauth.Authenticate(
+# # # # # # #     config['credentials'],
+# # # # # # #     config['cookie']['name'],
+# # # # # # #     config['cookie']['key'],
+# # # # # # #     config['cookie']['expiry_days'],
+# # # # # # # )
+
+# # # # # # # # Configure logging
+# # # # # # # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levellevelname)s - %(message)s", handlers=[logging.StreamHandler()])
+# # # # # # # logger = logging.getLogger(__name__)
+
+# # # # # # # # Load environment variables
+# # # # # # # load_dotenv()
+# # # # # # # logger.info("Environment variables loaded")
+
+# # # # # # # # Initialize session state
+# # # # # # # initialize_session_state()
+
+# # # # # # # # Authentication for App
+# # # # # # # with st.sidebar:
+# # # # # # #     name, authentication_status, username = authenticator.login('Login', 'main')
+
+# # # # # # # def load_content_from_blob(blob_service_client, container_name, account_name, content_type):
+# # # # # # #     """Load specific content from a .txt file in Azure Blob Storage based on the account name and content type."""
+# # # # # # #     blob_name = f"Documents/{account_name}/{content_type}.txt"
+
+# # # # # # #     try:
+# # # # # # #         blob_client = blob_service_client.get_blob_client(container_name, blob_name)
+# # # # # # #         blob_data = blob_client.download_blob().readall().decode('utf-8')
+# # # # # # #         return blob_data
+# # # # # # #     except Exception as e:
+# # # # # # #         logger.error(f"Error loading {content_type} for {account_name}: {e}")
+# # # # # # #         return f"Error: {content_type} content not found for {account_name}. Please ensure the file exists in Azure Blob Storage."
+
+# # # # # # # if st.session_state["authentication_status"]:
+# # # # # # #     # Load account names dynamically from the blob
+# # # # # # #     account_names = ["Mitsui Chemicals America", "Northpoint Commercial Finance", "iBAS"]
+
+# # # # # # #     # Check for OTP Secret and Generate if Not Present
+# # # # # # #     user_data = config['credentials']['usernames'].get(username, {})
+# # # # # # #     otp_secret = user_data.get('otp_secret', "")
+
+# # # # # # #     if not otp_secret:
+# # # # # # #         otp_secret = pyotp.random_base32()
+# # # # # # #         config['credentials']['usernames'][username]['otp_secret'] = otp_secret
+# # # # # # #         blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # # # #         st.session_state['otp_setup_complete'] = False
+# # # # # # #         st.session_state['show_qr_code'] = True
+# # # # # # #         logger.info("Generated new OTP secret and set show_qr_code to True for user %s", username)
+# # # # # # #     else:
+# # # # # # #         st.session_state['otp_setup_complete'] = True
+
+# # # # # # #     # Ensure OTP secret is properly handled
+# # # # # # #     if otp_secret:
+# # # # # # #         totp = pyotp.TOTP(otp_secret)
+# # # # # # #         logger.info("Using OTP secret for user %s: %s", username, otp_secret)
+
+# # # # # # #         if not st.session_state['otp_verified']:
+# # # # # # #             if st.session_state['show_qr_code']:
+# # # # # # #                 st.title("Welcome to AI Support Assistant! 👋")
+# # # # # # #                 otp_uri = totp.provisioning_uri(name=user_data.get('email', ''), issuer_name="AI Support Assistant")
+# # # # # # #                 qr = qrcode.make(otp_uri)
+# # # # # # #                 qr = qr.resize((200, 200))
+
+# # # # # # #                 st.image(qr, caption="Scan this QR code with your authenticator app")
+
+# # # # # # #             st.title("AI Support Assistant")
+# # # # # # #             otp_input = st.text_input("Enter the OTP from your authenticator app", type="password")
+# # # # # # #             verify_button_clicked = st.button("Verify OTP")
+
+# # # # # # #             if verify_button_clicked:
+# # # # # # #                 if totp.verify(otp_input):
+# # # # # # #                     st.session_state['otp_verified'] = True
+# # # # # # #                     st.session_state['show_qr_code'] = False
+# # # # # # #                     blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # # # #                     st.experimental_rerun()
+# # # # # # #                 else:
+# # # # # # #                     st.error("Invalid OTP. Please try again.")
+# # # # # # #         else:
+# # # # # # #             # Load FAISS indexes
+# # # # # # #             account_indexes = {
+# # # # # # #                 "Mitsui Chemicals America": [
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index1",
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index2_ocr"
+# # # # # # #                 ],
+# # # # # # #                 "Northpoint Commercial Finance": [
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
+# # # # # # #                 ],
+# # # # # # #                 "iBAS": [
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index1",
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
+# # # # # # #                 ]
+# # # # # # #             }
+# # # # # # #             embeddings = AzureOpenAIEmbeddings(
+# # # # # # #                 azure_deployment='embeddings-aims',
+# # # # # # #                 openai_api_version="2024-04-01-preview",
+# # # # # # #                 azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # # # #                 api_key=os.getenv("OPENAI_API_KEY_AZURE")
+# # # # # # #             )
+# # # # # # #             faiss_indexes = load_faiss_indexes(account_indexes, embeddings, connection_string)
+
+# # # # # # #             # Navigation and Main Content
+# # # # # # #             styles = {
+# # # # # # #                 "span": {
+# # # # # # #                     "border-radius": "0.1rem",
+# # # # # # #                     "color": "rgb(49, 51, 63)",
+# # # # # # #                     "margin": "0 0.125rem",
+# # # # # # #                     "padding": "0.400rem 0.400rem",
+# # # # # # #                 },
+# # # # # # #                 "active": {
+# # # # # # #                     "background-color": "rgba(255, 255, 255, 0.25)",
+# # # # # # #                 },
+# # # # # # #             }
+
+# # # # # # #             selected = st_navbar(["Home", "Chatbot", "Alerts and Escalation Matrix"],
+# # # # # # #                                  selected=st.session_state.selected_option, styles=styles)
+
+# # # # # # #             # --- APP ---
+# # # # # # #             if selected == "Home":
+# # # # # # #                 st.write("# Welcome to AI Support Assistant! 👋")
+# # # # # # #                 st.markdown(
+# # # # # # #                     """
+# # # # # # #                     Welcome to our AI Support Assistant. 
+# # # # # # #                     Use this tool to streamline your support process.
+                    
+# # # # # # #                     **☝️ Select an option from the navigation bar** to get started!
+
+# # # # # # #                     Please head to the Chatbot Tab to get started with your queries.
+# # # # # # #                     """
+# # # # # # #                 )
+# # # # # # #                 st.session_state.selected_option = 'Home'
+# # # # # # #             elif selected == 'Chatbot':
+# # # # # # #                 qa_chain = LLMChain(llm=AzureChatOpenAI(
+# # # # # # #                     model_name='gpt-4o',
+# # # # # # #                     openai_api_key=os.getenv("OPENAI_API_KEY_AZURE"),
+# # # # # # #                     azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # # # #                     openai_api_version="2024-04-01-preview",
+# # # # # # #                     temperature=0,
+# # # # # # #                     max_tokens=4000,
+# # # # # # #                     streaming=True,
+# # # # # # #                     verbose=True,
+# # # # # # #                     model_kwargs={'seed': 123}
+# # # # # # #                 ), prompt=PromptTemplate.from_template("""
+# # # # # # #                 ### Instruction ###
+# # # # # # #                 Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such. DO NOT PARAPHRASE ANYTHING AND GIVE EXACTLY AS ITS GIVEN IN THE DOCUMENT.
+
+# # # # # # #                 **Context:**
+# # # # # # #                 {context}
+
+# # # # # # #                 **Question:**
+# # # # # # #                 {question}
+
+# # # # # # #                 ### Guidelines ###
+# # # # # # #                 1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
+# # # # # # #                 2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
+# # # # # # #                 3. **Specificity**: Provide detailed and precise information directly related to the query.
+# # # # # # #                 4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
+# # # # # # #                 5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
+# # # # # # #                 6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
+
+# # # # # # #                 ### Example ###
+
+# # # # # # #                 #### IT Glue Response ####
+# # # # # # #                 [Your answer based on the given context]
+                                                       
+# # # # # # #                 ## External Information ##
+# # # # # # #                 []
+
+# # # # # # #                 #### Alerts and Escalation Matrix ####
+# # # # # # #                 [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
+                
+# # # # # # #                 ### Document Names ###
+# # # # # # #                 [List of documents and confidence scores (in %) with descending order.] 
+                
+# # # # # # #                 **Answer:**
+# # # # # # #                 """))
+# # # # # # #                 run_chatbot(faiss_indexes, blob_service_client, embeddings, qa_chain)
+# # # # # # #                 st.session_state.selected_option = 'Chatbot'
+
+# # # # # # #             elif selected == 'Alerts and Escalation Matrix':
+# # # # # # #                 with st.sidebar:
+# # # # # # #                     client_names = ["Select an Account Name"] + account_names
+# # # # # # #                     selected_client = st.selectbox("**Select Account Name** 🚩", client_names)
+# # # # # # #                     if selected_client != st.session_state['previous_clientOrg']:
+# # # # # # #                         st.session_state['clientOrg'] = selected_client
+# # # # # # #                         st.session_state['previous_clientOrg'] = selected_client
+                
+# # # # # # #                     if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# # # # # # #                         st.markdown(f"**You are viewing the {st.session_state['clientOrg']} Account**")
+                  
+
+
+# # # # # # #                 # if selected_client != st.session_state['previous_clientOrg']:
+# # # # # # #                 #     st.session_state['clientOrg'] = selected_client
+# # # # # # #                 #     st.session_state['previous_clientOrg'] = selected_client
+# # # # # # #                 #     if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# # # # # # #                 #         st.info(f"You are now viewing {st.session_state['clientOrg']} Account!")
+                        
+# # # # # # #                     alerts_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Alerts")
+# # # # # # #                     escalation_matrix_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Escalation Matrix")
+
+# # # # # # #                     st.subheader("Alerts")
+# # # # # # #                     st.markdown(alerts_content)
+
+# # # # # # #                     st.subheader("Escalation Matrix")
+# # # # # # #                     st.markdown(escalation_matrix_content)
+
+# # # # # # #                     else:
+# # # # # # #                         st.warning("Please select an account name above.")
+
+# # # # # # #             st.sidebar.markdown("""<div style="height: 12vh;"></div>""", unsafe_allow_html=True)
+# # # # # # #             st.sidebar.markdown(f'## Hello, *{st.session_state["name"]}*')
+# # # # # # #             if st.sidebar.button("Logout", key="logout_button"):
+# # # # # # #                 authenticator.logout('Logout', 'sidebar')
+# # # # # # #                 for key in list(st.session_state.keys()):
+# # # # # # #                     del st.session_state[key]
+# # # # # # #                 st.experimental_rerun()
+
+# # # # # # # elif st.session_state["authentication_status"] == False:
+# # # # # # #     st.sidebar.error('Username/password is incorrect')
+# # # # # # # elif st.session_state["authentication_status"] == None:
+# # # # # # #     st.sidebar.warning('Please enter your username and password')
+
+
+# # # # # # # import os
+# # # # # # # from azure.storage.blob import BlobServiceClient
+# # # # # # # import streamlit as st
+# # # # # # # from yaml.loader import SafeLoader
+# # # # # # # import yaml
+# # # # # # # from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+# # # # # # # from langchain.chains import LLMChain
+# # # # # # # from langchain.prompts import PromptTemplate
+# # # # # # # from dotenv import load_dotenv
+# # # # # # # import streamlit_authenticator as stauth
+# # # # # # # from streamlit_navigation_bar import st_navbar
+# # # # # # # import logging
+# # # # # # # import pyotp
+# # # # # # # import qrcode
+# # # # # # # import io
+
+# # # # # # # from aisupport import run_chatbot, initialize_session_state, load_faiss_indexes
+
+# # # # # # # # Set page configuration
+# # # # # # # st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide", initial_sidebar_state="auto")
+
+# # # # # # # st.markdown(
+# # # # # # #     """
+# # # # # # #     <style>
+# # # # # # #     /* Ensures that the sidebar starts at the top */
+# # # # # # #     .css-1lcbmhc {
+# # # # # # #         padding-top: 0px;
+# # # # # # #     }
+# # # # # # #     /* Adjusts padding around the sidebar's content */
+# # # # # # #     .css-1aumxhk {
+# # # # # # #         padding-top: 0px;
+# # # # # # #     }
+# # # # # # #     </style>
+# # # # # # #     """,
+# # # # # # #     unsafe_allow_html=True
+# # # # # # # )
+
+# # # # # # # with st.sidebar:
+# # # # # # #     st.image(r"./synoptek.png", width=275)
+
+# # # # # # # load_dotenv()
+# # # # # # # # Load config
+# # # # # # # connection_string = os.getenv("BLOB_CONNECTION_STRING")
+# # # # # # # container_name = "itgluecopilot"
+# # # # # # # config_blob_name = "config/config.yaml"
+# # # # # # # accounts_blob_name = "config/accounts.txt"
+
+# # # # # # # # BlobServiceClient
+# # # # # # # blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+# # # # # # # container_client = blob_service_client.get_container_client(container_name)
+
+# # # # # # # # Load the YAML configuration file
+# # # # # # # blob_client = container_client.get_blob_client(config_blob_name)
+# # # # # # # blob_data = blob_client.download_blob().readall()
+# # # # # # # config = yaml.load(io.BytesIO(blob_data), Loader=SafeLoader)
+
+# # # # # # # authenticator = stauth.Authenticate(
+# # # # # # #     config['credentials'],
+# # # # # # #     config['cookie']['name'],
+# # # # # # #     config['cookie']['key'],
+# # # # # # #     config['cookie']['expiry_days'],
+# # # # # # # )
+
+# # # # # # # # Configure logging
+# # # # # # # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(level)s - %(message)s", handlers=[logging.StreamHandler()])
+# # # # # # # logger = logging.getLogger(__name__)
+
+# # # # # # # # Load environment variables
+# # # # # # # load_dotenv()
+# # # # # # # logger.info("Environment variables loaded")
+
+# # # # # # # # Initialize session state
+# # # # # # # initialize_session_state()
+
+# # # # # # # # Authentication for App
+# # # # # # # with st.sidebar:
+# # # # # # #     name, authentication_status, username = authenticator.login('Login', 'main')
+
+# # # # # # # def load_content_from_blob(blob_service_client, container_name, account_name, content_type):
+# # # # # # #     """Load specific content from a .txt file in Azure Blob Storage based on the account name and content type."""
+# # # # # # #     blob_name = f"Documents/{account_name}/{content_type}.txt"
+
+# # # # # # #     try:
+# # # # # # #         blob_client = blob_service_client.get_blob_client(container_name, blob_name)
+# # # # # # #         blob_data = blob_client.download_blob().readall().decode('utf-8')
+# # # # # # #         return blob_data
+# # # # # # #     except Exception as e:
+# # # # # # #         logger.error(f"Error loading {content_type} for {account_name}: {e}")
+# # # # # # #         return f"Error: {content_type} content not found for {account_name}. Please ensure the file exists in Azure Blob Storage."
+
+# # # # # # # if st.session_state["authentication_status"]:
+# # # # # # #     # Load account names dynamically from the blob
+# # # # # # #     account_names = ["Mitsui Chemicals America", "Northpoint Commercial Finance", "iBAS"]
+
+# # # # # # #     # Check for OTP Secret and Generate if Not Present
+# # # # # # #     user_data = config['credentials']['usernames'].get(username, {})
+# # # # # # #     otp_secret = user_data.get('otp_secret', "")
+
+# # # # # # #     if not otp_secret:
+# # # # # # #         otp_secret = pyotp.random_base32()
+# # # # # # #         config['credentials']['usernames'][username]['otp_secret'] = otp_secret
+# # # # # # #         blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # # # #         st.session_state['otp_setup_complete'] = False
+# # # # # # #         st.session_state['show_qr_code'] = True
+# # # # # # #         logger.info("Generated new OTP secret and set show_qr_code to True for user %s", username)
+# # # # # # #     else:
+# # # # # # #         st.session_state['otp_setup_complete'] = True
+
+# # # # # # #     # Ensure OTP secret is properly handled
+# # # # # # #     if otp_secret:
+# # # # # # #         totp = pyotp.TOTP(otp_secret)
+# # # # # # #         logger.info("Using OTP secret for user %s: %s", username, otp_secret)
+
+# # # # # # #         if not st.session_state['otp_verified']:
+# # # # # # #             if st.session_state['show_qr_code']:
+# # # # # # #                 st.title("Welcome to AI Support Assistant! 👋")
+# # # # # # #                 otp_uri = totp.provisioning_uri(name=user_data.get('email', ''), issuer_name="AI Support Assistant")
+# # # # # # #                 qr = qrcode.make(otp_uri)
+# # # # # # #                 qr = qr.resize((200, 200))
+
+# # # # # # #                 st.image(qr, caption="Scan this QR code with your authenticator app")
+
+# # # # # # #             st.title("AI Support Assistant")
+# # # # # # #             otp_input = st.text_input("Enter the OTP from your authenticator app", type="password")
+# # # # # # #             verify_button_clicked = st.button("Verify OTP")
+
+# # # # # # #             if verify_button_clicked:
+# # # # # # #                 if totp.verify(otp_input):
+# # # # # # #                     st.session_state['otp_verified'] = True
+# # # # # # #                     st.session_state['show_qr_code'] = False
+# # # # # # #                     blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # # # #                     st.experimental_rerun()
+# # # # # # #                 else:
+# # # # # # #                     st.error("Invalid OTP. Please try again.")
+# # # # # # #         else:
+# # # # # # #             # Load FAISS indexes
+# # # # # # #             account_indexes = {
+# # # # # # #                 "Mitsui Chemicals America": [
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index1",
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index2_ocr"
+# # # # # # #                 ],
+# # # # # # #                 "Northpoint Commercial Finance": [
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
+# # # # # # #                 ],
+# # # # # # #                 "iBAS": [
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index1",
+# # # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
+# # # # # # #                 ]
+# # # # # # #             }
+# # # # # # #             embeddings = AzureOpenAIEmbeddings(
+# # # # # # #                 azure_deployment='embeddings-aims',
+# # # # # # #                 openai_api_version="2024-04-01-preview",
+# # # # # # #                 azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # # # #                 api_key=os.getenv("OPENAI_API_KEY_AZURE")
+# # # # # # #             )
+# # # # # # #             faiss_indexes = load_faiss_indexes(account_indexes, embeddings, connection_string)
+
+# # # # # # #             # Navigation and Main Content
+# # # # # # #             styles = {
+# # # # # # #                 "span": {
+# # # # # # #                     "border-radius": "0.1rem",
+# # # # # # #                     "color": "rgb(49, 51, 63)",
+# # # # # # #                     "margin": "0 0.125rem",
+# # # # # # #                     "padding": "0.400rem 0.400rem",
+# # # # # # #                 },
+# # # # # # #                 "active": {
+# # # # # # #                     "background-color": "rgba(255, 255, 255, 0.25)",
+# # # # # # #                 },
+# # # # # # #             }
+
+# # # # # # #             selected = st_navbar(["Home", "Chatbot", "Alerts and Escalation Matrix"],
+# # # # # # #                                  selected=st.session_state.selected_option, styles=styles)
+
+# # # # # # #             # --- APP ---
+# # # # # # #             if selected == "Home":
+# # # # # # #                 st.write("# Welcome to AI Support Assistant! 👋")
+# # # # # # #                 st.markdown(
+# # # # # # #                     """
+# # # # # # #                     Welcome to our AI Support Assistant. 
+# # # # # # #                     Use this tool to streamline your support process.
+                    
+# # # # # # #                     **☝️ Select an option from the navigation bar** to get started!
+
+# # # # # # #                     Please head to the Chatbot Tab to get started with your queries.
+# # # # # # #                     """
+# # # # # # #                 )
+# # # # # # #                 st.session_state.selected_option = 'Home'
+# # # # # # #             elif selected == 'Chatbot':
+# # # # # # #                 qa_chain = LLMChain(llm=AzureChatOpenAI(
+# # # # # # #                     model_name='gpt-4o',
+# # # # # # #                     openai_api_key=os.getenv("OPENAI_API_KEY_AZURE"),
+# # # # # # #                     azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # # # #                     openai_api_version="2024-04-01-preview",
+# # # # # # #                     temperature=0,
+# # # # # # #                     max_tokens=4000,
+# # # # # # #                     streaming=True,
+# # # # # # #                     verbose=True,
+# # # # # # #                     model_kwargs={'seed': 123}
+# # # # # # #                 ), prompt=PromptTemplate.from_template("""
+# # # # # # #                 ### Instruction ###
+# # # # # # #                 Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such. DO NOT PARAPHRASE ANYTHING AND GIVE EXACTLY AS ITS GIVEN IN THE DOCUMENT.
+
+# # # # # # #                 **Context:**
+# # # # # # #                 {context}
+
+# # # # # # #                 **Question:**
+# # # # # # #                 {question}
+
+# # # # # # #                 ### Guidelines ###
+# # # # # # #                 1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
+# # # # # # #                 2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
+# # # # # # #                 3. **Specificity**: Provide detailed and precise information directly related to the query.
+# # # # # # #                 4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
+# # # # # # #                 5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
+# # # # # # #                 6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
+
+# # # # # # #                 ### Example ###
+
+# # # # # # #                 #### IT Glue Response ####
+# # # # # # #                 [Your answer based on the given context]
+                                                       
+# # # # # # #                 ## External Information ##
+# # # # # # #                 []
+
+# # # # # # #                 #### Alerts and Escalation Matrix ####
+# # # # # # #                 [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
+                
+# # # # # # #                 ### Document Names ###
+# # # # # # #                 [List of documents and confidence scores (in %) with descending order.] 
+                
+# # # # # # #                 **Answer:**
+# # # # # # #                 """))
+# # # # # # #                 run_chatbot(faiss_indexes, blob_service_client, embeddings, qa_chain)
+# # # # # # #                 st.session_state.selected_option = 'Chatbot'
+
+# # # # # # #             elif selected == 'Alerts and Escalation Matrix':
+# # # # # # #                 with st.sidebar:
+# # # # # # #                     client_names = ["Select an Account Name"] + account_names
+# # # # # # #                     selected_client = st.selectbox("**Select Account Name** 🚩", client_names)
+# # # # # # #                     if selected_client != st.session_state['previous_clientOrg']:
+# # # # # # #                         st.session_state['clientOrg'] = selected_client
+# # # # # # #                         st.session_state['previous_clientOrg'] = selected_client
+
+# # # # # # #                     if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# # # # # # #                         st.info(f"You are viewing the {st.session_state['clientOrg']} Account")
+
+# # # # # # #                 if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# # # # # # #                     alerts_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Alerts")
+# # # # # # #                     escalation_matrix_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Escalation Matrix")
+
+# # # # # # #                     st.subheader("Alerts")
+# # # # # # #                     st.markdown(alerts_content)
+
+# # # # # # #                     st.subheader("Escalation Matrix")
+# # # # # # #                     st.markdown(escalation_matrix_content)
+
+# # # # # # #                 else:
+# # # # # # #                     st.warning("Please select an account name above.")
+
+# # # # # # #             st.sidebar.markdown("""<div style="height: 12vh;"></div>""", unsafe_allow_html=True)
+# # # # # # #             st.sidebar.markdown(f'## Hello, *{st.session_state["name"]}*')
+# # # # # # #             if st.sidebar.button("Logout", key="logout_button"):
+# # # # # # #                 authenticator.logout('Logout', 'sidebar')
+# # # # # # #                 for key in list(st.session_state.keys()):
+# # # # # # #                     del st.session_state[key]
+# # # # # # #                 st.experimental_rerun()
+
+# # # # # # # elif st.session_state["authentication_status"] == False:
+# # # # # # #     st.sidebar.error('Username/password is incorrect')
+# # # # # # # elif st.session_state["authentication_status"] == None:
+# # # # # # #     st.sidebar.warning('Please enter your username and password')
+
+
+
+
+# # # # # # import os
+# # # # # # from azure.storage.blob import BlobServiceClient
+# # # # # # import streamlit as st
+# # # # # # from yaml.loader import SafeLoader
+# # # # # # import yaml
+# # # # # # from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+# # # # # # from langchain.chains import LLMChain
+# # # # # # from langchain.prompts import PromptTemplate
+# # # # # # from dotenv import load_dotenv
+# # # # # # import streamlit_authenticator as stauth
+# # # # # # from streamlit_navigation_bar import st_navbar
+# # # # # # import logging
+# # # # # # import pyotp
+# # # # # # import qrcode
+# # # # # # import io
+
+# # # # # # from aisupport import run_chatbot, initialize_session_state, load_faiss_indexes
+
+# # # # # # # Set page configuration
+# # # # # # st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide", initial_sidebar_state="auto")
+
+# # # # # # st.markdown(
+# # # # # #     """
+# # # # # #     <style>
+# # # # # #     /* Ensures that the sidebar starts at the top */
+# # # # # #     .css-1lcbmhc {
+# # # # # #         padding-top: 0px;
+# # # # # #     }
+# # # # # #     /* Adjusts padding around the sidebar's content */
+# # # # # #     .css-1aumxhk {
+# # # # # #         padding-top: 0px;
+# # # # # #     }
+# # # # # #     </style>
+# # # # # #     """,
+# # # # # #     unsafe_allow_html=True
+# # # # # # )
+
+# # # # # # with st.sidebar:
+# # # # # #     st.image(r"./synoptek.png", width=275)
+
+# # # # # # load_dotenv()
+# # # # # # # Load config
+# # # # # # connection_string = os.getenv("BLOB_CONNECTION_STRING")
+# # # # # # container_name = "itgluecopilot"
+# # # # # # config_blob_name = "config/config.yaml"
+# # # # # # accounts_blob_name = "config/accounts.txt"
+
+# # # # # # # BlobServiceClient
+# # # # # # blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+# # # # # # container_client = blob_service_client.get_container_client(container_name)
+
+# # # # # # # Load the YAML configuration file
+# # # # # # blob_client = container_client.get_blob_client(config_blob_name)
+# # # # # # blob_data = blob_client.download_blob().readall()
+# # # # # # config = yaml.load(io.BytesIO(blob_data), Loader=SafeLoader)
+
+# # # # # # authenticator = stauth.Authenticate(
+# # # # # #     config['credentials'],
+# # # # # #     config['cookie']['name'],
+# # # # # #     config['cookie']['key'],
+# # # # # #     config['cookie']['expiry_days'],
+# # # # # # )
+
+# # # # # # # Configure logging
+# # # # # # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(level)s - %(message)s", handlers=[logging.StreamHandler()])
+# # # # # # logger = logging.getLogger(__name__)
+
+# # # # # # # Load environment variables
+# # # # # # load_dotenv()
+# # # # # # logger.info("Environment variables loaded")
+
+# # # # # # # Initialize session state
+# # # # # # initialize_session_state()
+
+# # # # # # # Authentication for App
+# # # # # # with st.sidebar:
+# # # # # #     name, authentication_status, username = authenticator.login('Login', 'main')
+
+# # # # # # def load_content_from_blob(blob_service_client, container_name, account_name, content_type):
+# # # # # #     """Load specific content from a .txt file in Azure Blob Storage based on the account name and content type."""
+# # # # # #     blob_name = f"Documents/{account_name}/{content_type}.txt"
+
+# # # # # #     try:
+# # # # # #         blob_client = blob_service_client.get_blob_client(container_name, blob_name)
+# # # # # #         blob_data = blob_client.download_blob().readall().decode('utf-8')
+# # # # # #         return blob_data
+# # # # # #     except Exception as e:
+# # # # # #         # logger.error(f"Error loading {content_type} for {account_name}: {e}")
+# # # # # #         return f"{content_type} content not found for {account_name}. Please ensure the file exists."
+
+# # # # # # if st.session_state["authentication_status"]:
+# # # # # #     # Load account names dynamically from the blob
+# # # # # #     account_names = ["Mitsui Chemicals America", "Northpoint Commercial Finance", "iBAS"]
+
+# # # # # #     # Check for OTP Secret and Generate if Not Present
+# # # # # #     user_data = config['credentials']['usernames'].get(username, {})
+# # # # # #     otp_secret = user_data.get('otp_secret', "")
+
+# # # # # #     if not otp_secret:
+# # # # # #         otp_secret = pyotp.random_base32()
+# # # # # #         config['credentials']['usernames'][username]['otp_secret'] = otp_secret
+# # # # # #         blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # # #         st.session_state['otp_setup_complete'] = False
+# # # # # #         st.session_state['show_qr_code'] = True
+# # # # # #         logger.info("Generated new OTP secret and set show_qr_code to True for user %s", username)
+# # # # # #     else:
+# # # # # #         st.session_state['otp_setup_complete'] = True
+
+# # # # # #     # Ensure OTP secret is properly handled
+# # # # # #     if otp_secret:
+# # # # # #         totp = pyotp.TOTP(otp_secret)
+# # # # # #         logger.info("Using OTP secret for user %s: %s", username, otp_secret)
+
+# # # # # #         if not st.session_state['otp_verified']:
+# # # # # #             if st.session_state['show_qr_code']:
+# # # # # #                 st.title("Welcome to AI Support Assistant! 👋")
+# # # # # #                 otp_uri = totp.provisioning_uri(name=user_data.get('email', ''), issuer_name="AI Support Assistant")
+# # # # # #                 qr = qrcode.make(otp_uri)
+# # # # # #                 qr = qr.resize((200, 200))
+
+# # # # # #                 st.image(qr, caption="Scan this QR code with your authenticator app")
+
+# # # # # #             st.title("AI Support Assistant")
+# # # # # #             otp_input = st.text_input("Enter the OTP from your authenticator app", type="password")
+# # # # # #             verify_button_clicked = st.button("Verify OTP")
+
+# # # # # #             if verify_button_clicked:
+# # # # # #                 if totp.verify(otp_input):
+# # # # # #                     st.session_state['otp_verified'] = True
+# # # # # #                     st.session_state['show_qr_code'] = False
+# # # # # #                     blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # # #                     st.experimental_rerun()
+# # # # # #                 else:
+# # # # # #                     st.error("Invalid OTP. Please try again.")
+# # # # # #         else:
+# # # # # #             # Load FAISS indexes
+# # # # # #             account_indexes = {
+# # # # # #                 "Mitsui Chemicals America": [
+# # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index1",
+# # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index2_ocr"
+# # # # # #                 ],
+# # # # # #                 "Northpoint Commercial Finance": [
+# # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
+# # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
+# # # # # #                 ],
+# # # # # #                 "iBAS": [
+# # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index1",
+# # # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
+# # # # # #                 ]
+# # # # # #             }
+# # # # # #             embeddings = AzureOpenAIEmbeddings(
+# # # # # #                 azure_deployment='embeddings-aims',
+# # # # # #                 openai_api_version="2024-04-01-preview",
+# # # # # #                 azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # # #                 api_key=os.getenv("OPENAI_API_KEY_AZURE")
+# # # # # #             )
+# # # # # #             faiss_indexes = load_faiss_indexes(account_indexes, embeddings, connection_string)
+
+# # # # # #             # Navigation and Main Content
+# # # # # #             styles = {
+# # # # # #                 "span": {
+# # # # # #                     "border-radius": "0.1rem",
+# # # # # #                     "color": "rgb(49, 51, 63)",
+# # # # # #                     "margin": "0 0.125rem",
+# # # # # #                     "padding": "0.400rem 0.400rem",
+# # # # # #                 },
+# # # # # #                 "active": {
+# # # # # #                     "background-color": "rgba(255, 255, 255, 0.25)",
+# # # # # #                 },
+# # # # # #             }
+
+# # # # # #             selected = st_navbar(["Home", "Chatbot", "Alerts and Escalation Matrix"],
+# # # # # #                                  selected=st.session_state.selected_option, styles=styles)
+
+# # # # # #             # --- APP ---
+# # # # # #             if selected == "Home":
+# # # # # #                 st.write("# Welcome to AI Support Assistant! 👋")
+# # # # # #                 st.markdown(
+# # # # # #                 """
+# # # # # #                 Welcome to the AI Support Assistant! This tool is designed to streamline your support process by providing quick access to essential information and AI-powered assistance.
+
+# # # # # #                 ### Getting Started:
+
+# # # # # #                 - **☝️ Select Chatbot option from the navigation bar** to begin interacting with the AI Support Assistant.
+# # # # # #                 - Make sure to select the correct account in the Alerts and Escalation Matrix tab to view the most relevant information.
+
+# # # # # #                 ### How to Use the App:
+
+# # # # # #                 **1. Chatbot Tab:**  
+# # # # # #                 Navigate to the **Chatbot** tab to interact with our AI Assistant. You can ask questions or provide prompts related to your support needs, and the AI will generate detailed responses based on the context provided. This feature is ideal for quickly resolving issues or getting specific information.
+
+# # # # # #                 **Steps:**
+# # # # # #                 - Click on the **Chatbot** tab in the navigation bar and select an **Account**.
+# # # # # #                 - Type your question or request in the input box at the bottom of the page.
+# # # # # #                 - The AI will process your query and provide a response based on the available data.
+
+# # # # # #                 **2. Alerts and Escalation Matrix Tab:**  
+# # # # # #                 Visit the **Alerts and Escalation Matrix** tab to view critical alerts and the escalation matrix for specific accounts. This section provides important information about who to contact and the appropriate escalation procedures.
+
+# # # # # #                 **Steps:**
+# # # # # #                 - Click on the **Alerts and Escalation Matrix** tab in the navigation bar.
+# # # # # #                 - Use the sidebar to select the account you wish to view.
+# # # # # #                 - The page will display the relevant alerts and escalation matrix for the selected account.
+                
+# # # # # #                 If you need assistance at any point, feel free to ask a question in the Chatbot tab.
+# # # # # #                 """
+# # # # # #                 )
+# # # # # #                 st.session_state.selected_option = 'Home'
+# # # # # #             elif selected == 'Chatbot':
+# # # # # #                 qa_chain = LLMChain(llm=AzureChatOpenAI(
+# # # # # #                     model_name='gpt-4o',
+# # # # # #                     openai_api_key=os.getenv("OPENAI_API_KEY_AZURE"),
+# # # # # #                     azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # # #                     openai_api_version="2024-04-01-preview",
+# # # # # #                     temperature=0,
+# # # # # #                     max_tokens=4000,
+# # # # # #                     streaming=True,
+# # # # # #                     verbose=True,
+# # # # # #                     model_kwargs={'seed': 123}
+# # # # # #                 ), prompt=PromptTemplate.from_template("""
+# # # # # #                 ### Instruction ###
+# # # # # #                 Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such. DO NOT PARAPHRASE ANYTHING AND GIVE EXACTLY AS ITS GIVEN IN THE DOCUMENT.
+
+# # # # # #                 **Context:**
+# # # # # #                 {context}
+
+# # # # # #                 **Question:**
+# # # # # #                 {question}
+
+# # # # # #                 ### Guidelines ###
+# # # # # #                 1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
+# # # # # #                 2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
+# # # # # #                 3. **Specificity**: Provide detailed and precise information directly related to the query.
+# # # # # #                 4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
+# # # # # #                 5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
+# # # # # #                 6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
+
+# # # # # #                 ### Example ###
+
+# # # # # #                 #### IT Glue Response ####
+# # # # # #                 [Your answer based on the given context]
+                                                       
+# # # # # #                 ## External Information ##
+# # # # # #                 []
+
+# # # # # #                 #### Alerts and Escalation Matrix ####
+# # # # # #                 [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
+                
+# # # # # #                 ### Document Names ###
+# # # # # #                 [List of documents and confidence scores (in %) with descending order.] 
+                
+# # # # # #                 **Answer:**
+# # # # # #                 """))
+# # # # # #                 run_chatbot(faiss_indexes, blob_service_client, embeddings, qa_chain)
+# # # # # #                 st.session_state.selected_option = 'Chatbot'
+
+# # # # # #             elif selected == 'Alerts and Escalation Matrix':
+# # # # # #                 with st.sidebar:
+# # # # # #                     client_names = ["Select an Account Name"] + account_names
+# # # # # #                     selected_client = st.selectbox("**Select Account Name** 🚩", client_names)
+# # # # # #                     if selected_client != st.session_state['previous_clientOrg']:
+# # # # # #                         st.session_state['clientOrg'] = selected_client
+# # # # # #                         st.session_state['previous_clientOrg'] = selected_client
+
+# # # # # #                     if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# # # # # #                         st.info(f"You are viewing the {st.session_state['clientOrg']} Account")
+
+# # # # # #                 if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# # # # # #                     alerts_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Alerts")
+# # # # # #                     escalation_matrix_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Escalation Matrix")
+
+# # # # # #                     st.subheader("Alerts")
+# # # # # #                     st.markdown(alerts_content)
+
+# # # # # #                     st.subheader("Escalation Matrix")
+# # # # # #                     st.markdown(escalation_matrix_content)
+# # # # # #                 else:
+# # # # # #                     st.subheader("Alerts")
+# # # # # #                     st.warning("Please select an account name to view the alerts.")
+
+# # # # # #                     st.subheader("Escalation Matrix")
+# # # # # #                     st.warning("Please select an account name to view the escalation matrix.")
+
+# # # # # #             st.sidebar.markdown("""<div style="height: 12vh;"></div>""", unsafe_allow_html=True)
+# # # # # #             st.sidebar.markdown(f'## Hello, *{st.session_state["name"]}*')
+# # # # # #             if st.sidebar.button("Logout", key="logout_button"):
+# # # # # #                 authenticator.logout('Logout', 'sidebar')
+# # # # # #                 for key in list(st.session_state.keys()):
+# # # # # #                     del st.session_state[key]
+# # # # # #                 st.experimental_rerun()
+
+# # # # # # elif st.session_state["authentication_status"] == False:
+# # # # # #     st.sidebar.error('Username/password is incorrect')
+# # # # # # elif st.session_state["authentication_status"] == None:
+# # # # # #     st.sidebar.warning('Please enter your username and password')
+
+
+
+# # # # # import os
+# # # # # from azure.storage.blob import BlobServiceClient
+# # # # # import streamlit as st
+# # # # # from yaml.loader import SafeLoader
+# # # # # import yaml
+# # # # # from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+# # # # # from langchain.chains import LLMChain
+# # # # # from langchain.prompts import PromptTemplate
+# # # # # from dotenv import load_dotenv
+# # # # # import streamlit_authenticator as stauth
+# # # # # from streamlit_navigation_bar import st_navbar
+# # # # # import logging
+# # # # # import pyotp
+# # # # # import qrcode
+# # # # # import io
+
+# # # # # from aisupport import run_chatbot, initialize_session_state, load_faiss_indexes
+
+# # # # # # Set page configuration
+# # # # # st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide", initial_sidebar_state="auto")
+
+# # # # # st.markdown(
+# # # # #     """
+# # # # #     <style>
+# # # # #     /* Ensures that the sidebar starts at the top */
+# # # # #     .css-1lcbmhc {
+# # # # #         padding-top: 0px;
+# # # # #     }
+# # # # #     /* Adjusts padding around the sidebar's content */
+# # # # #     .css-1aumxhk {
+# # # # #         padding-top: 0px;
+# # # # #     }
+# # # # #     </style>
+# # # # #     """,
+# # # # #     unsafe_allow_html=True
+# # # # # )
+
+# # # # # with st.sidebar:
+# # # # #     st.image(r"./synoptek.png", width=275)
+
+# # # # # load_dotenv()
+# # # # # # Load config
+# # # # # connection_string = os.getenv("BLOB_CONNECTION_STRING")
+# # # # # container_name = "itgluecopilot"
+# # # # # config_blob_name = "config/config.yaml"
+
+# # # # # # BlobServiceClient
+# # # # # blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+# # # # # container_client = blob_service_client.get_container_client(container_name)
+
+# # # # # # Load the YAML configuration file
+# # # # # blob_client = container_client.get_blob_client(config_blob_name)
+# # # # # blob_data = blob_client.download_blob().readall()
+# # # # # config = yaml.load(io.BytesIO(blob_data), Loader=SafeLoader)
+
+# # # # # authenticator = stauth.Authenticate(
+# # # # #     config['credentials'],
+# # # # #     config['cookie']['name'],
+# # # # #     config['cookie']['key'],
+# # # # #     config['cookie']['expiry_days'],
+# # # # # )
+
+# # # # # # Configure logging
+# # # # # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(level)s - %(message)s", handlers=[logging.StreamHandler()])
+# # # # # logger = logging.getLogger(__name__)
+
+# # # # # # Load environment variables
+# # # # # load_dotenv()
+# # # # # logger.info("Environment variables loaded")
+
+# # # # # # Initialize session state
+# # # # # initialize_session_state()
+
+# # # # # # Authentication for App
+# # # # # with st.sidebar:
+# # # # #     name, authentication_status, username = authenticator.login('Login', 'main')
+
+# # # # # if st.session_state["authentication_status"]:
+# # # # #     # Load account names dynamically from the blob
+# # # # #     account_names = ["Mitsui Chemicals America", "Northpoint Commercial Finance", "iBAS"]
+
+# # # # #     # Check for OTP Secret and Generate if Not Present
+# # # # #     user_data = config['credentials']['usernames'].get(username, {})
+# # # # #     otp_secret = user_data.get('otp_secret', "")
+
+# # # # #     if not otp_secret:
+# # # # #         otp_secret = pyotp.random_base32()
+# # # # #         config['credentials']['usernames'][username]['otp_secret'] = otp_secret
+# # # # #         blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # #         st.session_state['otp_setup_complete'] = False
+# # # # #         st.session_state['show_qr_code'] = True
+# # # # #         logger.info("Generated new OTP secret and set show_qr_code to True for user %s", username)
+# # # # #     else:
+# # # # #         st.session_state['otp_setup_complete'] = True
+
+# # # # #     # Ensure OTP secret is properly handled
+# # # # #     if otp_secret:
+# # # # #         totp = pyotp.TOTP(otp_secret)
+# # # # #         logger.info("Using OTP secret for user %s: %s", username, otp_secret)
+
+# # # # #         if not st.session_state['otp_verified']:
+# # # # #             if st.session_state['show_qr_code']:
+# # # # #                 st.title("Welcome to AI Support Assistant! 👋")
+# # # # #                 otp_uri = totp.provisioning_uri(name=user_data.get('email', ''), issuer_name="AI Support Assistant")
+# # # # #                 qr = qrcode.make(otp_uri)
+# # # # #                 qr = qr.resize((200, 200))
+
+# # # # #                 st.image(qr, caption="Scan this QR code with your authenticator app")
+
+# # # # #             st.title("AI Support Assistant")
+# # # # #             otp_input = st.text_input("Enter the OTP from your authenticator app", type="password")
+# # # # #             verify_button_clicked = st.button("Verify OTP")
+
+# # # # #             if verify_button_clicked:
+# # # # #                 if totp.verify(otp_input):
+# # # # #                     st.session_state['otp_verified'] = True
+# # # # #                     st.session_state['show_qr_code'] = False
+# # # # #                     blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# # # # #                     st.experimental_rerun()
+# # # # #                 else:
+# # # # #                     st.error("Invalid OTP. Please try again.")
+# # # # #         else:
+# # # # #             # Load FAISS indexes
+# # # # #             account_indexes = {
+# # # # #                 "Mitsui Chemicals America": [
+# # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index1",
+# # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index2_ocr"
+# # # # #                 ],
+# # # # #                 "Northpoint Commercial Finance": [
+# # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
+# # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
+# # # # #                 ],
+# # # # #                 "iBAS": [
+# # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index1",
+# # # # #                     "itgluecopilot/Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
+# # # # #                 ]
+# # # # #             }
+# # # # #             embeddings = AzureOpenAIEmbeddings(
+# # # # #                 azure_deployment='embeddings-aims',
+# # # # #                 openai_api_version="2024-04-01-preview",
+# # # # #                 azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # #                 api_key=os.getenv("OPENAI_API_KEY_AZURE")
+# # # # #             )
+# # # # #             faiss_indexes = load_faiss_indexes(account_indexes, embeddings, connection_string)
+
+# # # # #             # Navigation and Main Content
+# # # # #             styles = {
+# # # # #                 "span": {
+# # # # #                     "border-radius": "0.1rem",
+# # # # #                     "color": "rgb(49, 51, 63)",
+# # # # #                     "margin": "0 0.125rem",
+# # # # #                     "padding": "0.400rem 0.400rem",
+# # # # #                     "color": "orange",
+# # # # #                     "text-decoration": "underline",
+# # # # #                 },
+# # # # #                 "active": {
+# # # # #                     "background-color": "rgba(255, 255, 255, 0.25)"
+# # # # #                     # "color": "orange"
+# # # # #                 },
+# # # # #             }
+
+# # # # #             selected = st_navbar(["Home", "Chatbot", "Alerts and Escalation Matrix"],
+# # # # #                                  selected=st.session_state.selected_option, styles=styles)
+
+# # # # #             # --- APP ---
+# # # # #             if selected == "Home":
+# # # # #                 st.write("# Welcome to AI Support Assistant! 👋")
+# # # # #                 st.markdown(
+# # # # #                 """
+# # # # #                 Welcome to the AI Support Assistant! This tool is designed to streamline your support process by providing quick access to essential information and AI-powered assistance.
+
+# # # # #                 ### Getting Started:
+
+# # # # #                 - **☝️ Select Chatbot option from the navigation bar** to begin interacting with the AI Support Assistant.
+# # # # #                 - Make sure to select the correct account in the Alerts and Escalation Matrix tab to view the most relevant information.
+
+# # # # #                 ### How to Use the App:
+
+# # # # #                 **1. Chatbot Tab:**  
+# # # # #                 Navigate to the **Chatbot** tab to interact with our AI Assistant. You can ask questions or provide prompts related to your support needs, and the AI will generate detailed responses based on the context provided. This feature is ideal for quickly resolving issues or getting specific information.
+
+# # # # #                 **Steps:**
+# # # # #                 - Click on the **Chatbot** tab in the navigation bar and select an **Account**.
+# # # # #                 - Type your question or request in the input box at the bottom of the page.
+# # # # #                 - The AI will process your query and provide a response based on the available data.
+
+# # # # #                 **2. Alerts and Escalation Matrix Tab:**  
+# # # # #                 Visit the **Alerts and Escalation Matrix** tab to view critical alerts and the escalation matrix for specific accounts. This section provides important information about who to contact and the appropriate escalation procedures.
+
+# # # # #                 **Steps:**
+# # # # #                 - Click on the **Alerts and Escalation Matrix** tab in the navigation bar.
+# # # # #                 - Use the sidebar to select the account you wish to view.
+# # # # #                 - The page will display the relevant alerts and escalation matrix for the selected account.
+                
+# # # # #                 If you need assistance at any point, feel free to ask a question in the Chatbot tab.
+# # # # #                 """
+# # # # #                 )
+# # # # #                 st.session_state.selected_option = 'Home'
+# # # # #             elif selected == 'Chatbot':
+# # # # #                 qa_chain = LLMChain(llm=AzureChatOpenAI(
+# # # # #                     model_name='gpt-4o',
+# # # # #                     openai_api_key=os.getenv("OPENAI_API_KEY_AZURE"),
+# # # # #                     azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# # # # #                     openai_api_version="2024-04-01-preview",
+# # # # #                     temperature=0,
+# # # # #                     max_tokens=4000,
+# # # # #                     streaming=True,
+# # # # #                     verbose=True,
+# # # # #                     model_kwargs={'seed': 123}
+# # # # #                 ), prompt=PromptTemplate.from_template("""
+# # # # #                 ### Instruction ###
+# # # # #                 Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such. DO NOT PARAPHRASE ANYTHING AND GIVE EXACTLY AS ITS GIVEN IN THE DOCUMENT.
+
+# # # # #                 **Context:**
+# # # # #                 {context}
+
+# # # # #                 **Question:**
+# # # # #                 {question}
+
+# # # # #                 ### Guidelines ###
+# # # # #                 1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
+# # # # #                 2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
+# # # # #                 3. **Specificity**: Provide detailed and precise information directly related to the query.
+# # # # #                 4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
+# # # # #                 5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
+# # # # #                 6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
+
+# # # # #                 ### Example ###
+
+# # # # #                 #### IT Glue Response ####
+# # # # #                 [Your answer based on the given context]
+                                                       
+# # # # #                 ## External Information ##
+# # # # #                 []
+
+# # # # #                 #### Alerts and Escalation Matrix ####
+# # # # #                 [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
+                
+# # # # #                 ### Document Names ###
+# # # # #                 [List of documents and confidence scores (in %) with descending order.] 
+                
+# # # # #                 **Answer:**
+# # # # #                 """))
+# # # # #                 run_chatbot(faiss_indexes, blob_service_client, embeddings, qa_chain)
+# # # # #                 st.session_state.selected_option = 'Chatbot'
+
+# # # # #             elif selected == 'Alerts and Escalation Matrix':
+# # # # #                 with st.sidebar:
+# # # # #                     client_names = ["Select an Account Name"] + account_names
+# # # # #                     selected_client = st.selectbox("**Select Account Name** 🚩", client_names)
+# # # # #                     if selected_client != st.session_state['previous_clientOrg']:
+# # # # #                         st.session_state['clientOrg'] = selected_client
+# # # # #                         st.session_state['previous_clientOrg'] = selected_client
+
+# # # # #                     if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# # # # #                         st.info(f"You are viewing the {st.session_state['clientOrg']} Account")
+
+# # # # #                 if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# # # # #                     alerts_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Alerts")
+# # # # #                     escalation_matrix_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Escalation Matrix")
+
+# # # # #                     st.subheader("Alerts")
+# # # # #                     st.markdown(alerts_content)
+
+# # # # #                     st.subheader("Escalation Matrix")
+# # # # #                     st.markdown(escalation_matrix_content)
+# # # # #                 else:
+# # # # #                     st.subheader("Alerts")
+# # # # #                     st.warning("Please select an account name to view the alerts.")
+
+# # # # #                     st.subheader("Escalation Matrix")
+# # # # #                     st.warning("Please select an account name to view the escalation matrix.")
+
+# # # # #             st.sidebar.markdown("""<div style="height: 12vh;"></div>""", unsafe_allow_html=True)
+# # # # #             st.sidebar.markdown(f'## Hello, *{st.session_state["name"]}*')
+# # # # #             if st.sidebar.button("Logout", key="logout_button"):
+# # # # #                 authenticator.logout('Logout', 'sidebar')
+# # # # #                 for key in list(st.session_state.keys()):
+# # # # #                     del st.session_state[key]
+# # # # #                 st.experimental_rerun()
+
+# # # # # elif st.session_state["authentication_status"] == False:
+# # # # #     st.sidebar.error('Username/password is incorrect')
+# # # # #     st.write("# Welcome to AI Support Assistant! 👋")
+# # # # #     st.markdown(
+# # # # #         """
+# # # # #         Please enter your username and password to log in.
+# # # # #         """
+# # # # #     )
+# # # # # elif st.session_state["authentication_status"] == None:
+# # # # #     st.sidebar.warning('Please enter your username and password')
+# # # # #     st.write("# Welcome to AI Support Assistant! 👋")
+# # # # #     st.markdown(
+# # # # #         """
+# # # # #         Please enter your username and password to log in.
+# # # # #         """
+# # # # #     )
+
+
+# # import os
+# # from azure.storage.blob import BlobServiceClient
+# # import streamlit as st
+# # from yaml.loader import SafeLoader
+# # import yaml
+# # from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+# # from langchain.chains import LLMChain
+# # from langchain.prompts import PromptTemplate
+# # from dotenv import load_dotenv
+# # import streamlit_authenticator as stauth
+# # from streamlit_navigation_bar import st_navbar
+# # import logging
+# # import pyotp
+# # import qrcode
+# # import io
+
+# # from aisupport import run_chatbot, initialize_session_state, load_faiss_indexes
+
+# # # Set page configuration
+# # st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide", initial_sidebar_state="auto")
+
+# # # st.markdown(
+# # #     """
+# # #     <style>
+# # #     /* Ensures that the sidebar starts at the top */
+# # #     .css-1lcbmhc {
+# # #         padding-top: 0px;
+# # #     }
+# # #     /* Adjusts padding around the sidebar's content */
+# # #     .css-1aumxhk {
+# # #         padding-top: 0px;
+# # #     }
+# # #     </style>
+# # #     """,
+# # #     unsafe_allow_html=True
+# # # )
+
+
+# # with st.sidebar:
+# #     st.image(r"./synoptek.png", width=275)
+
+# # load_dotenv()
+# # # Load config
+# # connection_string = os.getenv("BLOB_CONNECTION_STRING")
+# # container_name = "itgluecopilot"
+# # config_blob_name = "config/config.yaml"
+
+# # # BlobServiceClient
+# # blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+# # container_client = blob_service_client.get_container_client(container_name)
+
+# # # Load the YAML configuration file
+# # blob_client = container_client.get_blob_client(config_blob_name)
+# # blob_data = blob_client.download_blob().readall()
+# # config = yaml.load(io.BytesIO(blob_data), Loader=SafeLoader)
+
+# # authenticator = stauth.Authenticate(
+# #     config['credentials'],
+# #     config['cookie']['name'],
+# #     config['cookie']['key'],
+# #     config['cookie']['expiry_days'],
+# # )
+
+
+# # # Configure logging
+# # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler()])
+# # logger = logging.getLogger(__name__)
+
+
+# # # logger.info("Environment variables loaded")
+
+# # # Load environment variables
+# # load_dotenv()
+# # logger.info("Environment variables loaded")
+
+# # # Initialize session state
+# # initialize_session_state()
+
+# # # Authentication for App
+# # with st.sidebar:
+# #     name, authentication_status, username = authenticator.login('Login', 'main')
+
+# # def load_content_from_blob(blob_service_client, container_name, account_name, content_type):
+# #     """Load specific content from a .txt file in Azure Blob Storage based on the account name and content type."""
+# #     blob_name = f"Documents/{account_name}/{content_type}.txt"
+
+# #     try:
+# #         blob_client = blob_service_client.get_blob_client(container_name, blob_name)
+# #         blob_data = blob_client.download_blob().readall().decode('utf-8')
+# #         return blob_data
+# #     except Exception as e:
+# #         # logger.error(f"Error loading {content_type} for {account_name}: {e}")
+# #         return f"{content_type} content not found for {account_name}. Please ensure the file exists."
+
+# # if st.session_state["authentication_status"]:
+# #     # Load account names dynamically from the blob
+# #     account_names = ["Mitsui Chemicals America", "Northpoint Commercial Finance", "iBAS"]
+
+# #     # Check for OTP Secret and Generate if Not Present
+# #     user_data = config['credentials']['usernames'].get(username, {})
+# #     otp_secret = user_data.get('otp_secret', "")
+
+# #     if not otp_secret:
+# #         otp_secret = pyotp.random_base32()
+# #         config['credentials']['usernames'][username]['otp_secret'] = otp_secret
+# #         blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# #         st.session_state['otp_setup_complete'] = False
+# #         st.session_state['show_qr_code'] = True
+# #         logger.info("Generated new OTP secret and set show_qr_code to True for user %s", username)
+# #     else:
+# #         st.session_state['otp_setup_complete'] = True
+
+# #     # Ensure OTP secret is properly handled
+# #     if otp_secret:
+# #         totp = pyotp.TOTP(otp_secret)
+# #         logger.info("Using OTP secret for user %s: %s", username, otp_secret)
+
+# #         if not st.session_state['otp_verified']:
+# #             if st.session_state['show_qr_code']:
+# #                 st.title("Welcome to AI Support Assistant! 👋")
+# #                 otp_uri = totp.provisioning_uri(name=user_data.get('email', ''), issuer_name="AI Support Assistant")
+# #                 qr = qrcode.make(otp_uri)
+# #                 qr = qr.resize((200, 200))
+
+# #                 st.image(qr, caption="Scan this QR code with your authenticator app")
+
+# #             st.title("AI Support Assistant")
+# #             otp_input = st.text_input("Enter the OTP from your authenticator app", type="password")
+# #             verify_button_clicked = st.button("Verify OTP")
+
+# #             if verify_button_clicked:
+# #                 if totp.verify(otp_input):
+# #                     st.session_state['otp_verified'] = True
+# #                     st.session_state['show_qr_code'] = False
+# #                     blob_client.upload_blob(yaml.dump(config), overwrite=True)
+# #                     st.experimental_rerun()
+# #                 else:
+# #                     st.error("Invalid OTP. Please try again.")
+# #         else:
+# #             # Load FAISS indexes
+# #             account_indexes = {
+# #                 "Mitsui Chemicals America": [
+# #                     r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index1",
+# #                     r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index2_ocr"
+# #                 ],
+# #                 "Northpoint Commercial Finance": [
+# #                     r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
+# #                     r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
+# #                 ],
+# #                 "iBAS": [
+# #                     r"./Faiss_Index_IT Glue/Index_iBAS/index1",
+# #                     r"./Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
+# #                 ]
+# #             }
+# #             embeddings = AzureOpenAIEmbeddings(
+# #                 azure_deployment='embeddings-aims',
+# #                 openai_api_version="2024-04-01-preview",
+# #                 azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# #                 api_key=os.getenv("OPENAI_API_KEY_AZURE")
+# #             )
+# #             faiss_indexes = load_faiss_indexes(account_indexes, embeddings)#, connection_string)
+
+# #             # Navigation and Main Content
+# #             styles = {
+# #                 "span": {
+# #                     "border-radius": "0.1rem",
+# #                     "color": "orange",
+# #                     "margin": "0 0.125rem",
+# #                     "padding": "0.400rem 0.400rem",
+# #                 },
+# #                 "active": {
+# #                     "background-color": "rgba(255, 255, 255, 0.25)",
+# #                     "color": "orange",  # Active text color to orange
+# #                     "text-decoration": "underline",  # Underline the active text
+# #                 },
+# #             }
+
+# #             # Render the navigation bar and update session state
+# #             selected = st_navbar(["Home", "Chatbot", "Alerts and Escalation Matrix"],
+# #                                  selected=st.session_state.get('selected_option', 'Home'), styles=styles)
+            
+            
+# #             # Update the session state with the selected option
+# #             st.session_state.selected_option = selected
+
+# #             # --- APP ---
+# #             if selected == "Home":
+# #                 st.write("# Welcome to AI Support Assistant! 👋")
+# #                 st.markdown(
+# #                 """
+# #                 Welcome to the AI Support Assistant! This tool is designed to streamline your support process by providing quick access to essential information and AI-powered assistance.
+
+# #                 ### Getting Started:
+
+# #                 - **☝️ Select Chatbot option from the navigation bar** to begin interacting with the AI Support Assistant.
+# #                 - Make sure to select the correct account in the Alerts and Escalation Matrix tab to view the most relevant information.
+
+# #                 ### How to Use the App:
+
+# #                 **1. Chatbot Tab:**  
+# #                 Navigate to the **Chatbot** tab to interact with our AI Assistant. You can ask questions or provide prompts related to your support needs, and the AI will generate detailed responses based on the context provided. This feature is ideal for quickly resolving issues or getting specific information.
+
+# #                 **Steps:**
+# #                 - Click on the **Chatbot** tab in the navigation bar and select an **Account**.
+# #                 - Type your question or request in the input box at the bottom of the page.
+# #                 - The AI will process your query and provide a response based on the available data.
+
+# #                 **2. Alerts and Escalation Matrix Tab:**  
+# #                 Visit the **Alerts and Escalation Matrix** tab to view critical alerts and the escalation matrix for specific accounts. This section provides important information about who to contact and the appropriate escalation procedures.
+
+# #                 **Steps:**
+# #                 - Click on the **Alerts and Escalation Matrix** tab in the navigation bar.
+# #                 - Use the sidebar to select the account you wish to view.
+# #                 - The page will display the relevant alerts and escalation matrix for the selected account.
+                
+# #                 If you need assistance at any point, feel free to ask a question in the Chatbot tab.
+# #                 """
+# #                 )
+# #             elif selected == 'Chatbot':
+# #                 qa_chain = LLMChain(llm=AzureChatOpenAI(
+# #                     model_name='gpt-4o',
+# #                     openai_api_key=os.getenv("OPENAI_API_KEY_AZURE"),
+# #                     azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+# #                     openai_api_version="2024-04-01-preview",
+# #                     temperature=0,
+# #                     max_tokens=4000,
+# #                     streaming=True,
+# #                     verbose=True,
+# #                     model_kwargs={'seed': 123}
+# #                 ), prompt=PromptTemplate.from_template("""
+# #                 ### Instruction ###
+# #                 Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such. DO NOT PARAPHRASE ANYTHING AND GIVE EXACTLY AS ITS GIVEN IN THE DOCUMENT.
+
+# #                 **Context:**
+# #                 {context}
+
+# #                 **Question:**
+# #                 {question}
+
+# #                 ### Guidelines ###
+# #                 1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
+# #                 2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
+# #                 3. **Specificity**: Provide detailed and precise information directly related to the query.
+# #                 4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
+# #                 5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
+# #                 6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
+
+# #                 ### Example ###
+
+# #                 #### IT Glue Response ####
+# #                 [Your answer based on the given context]
+                                                       
+# #                 ## External Information ##
+# #                 []
+
+# #                 #### Alerts and Escalation Matrix ####
+# #                 [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
+                
+# #                 ### Document Names ###
+# #                 [List of documents and confidence scores (in %) with descending order.] 
+                
+# #                 **Answer:**
+# #                 """))
+# #                 run_chatbot(faiss_indexes, blob_service_client, embeddings, qa_chain)
+            
+# #             elif selected == 'Alerts and Escalation Matrix':
+# #                 with st.sidebar:
+# #                     client_names = ["Select an Account Name"] + account_names
+# #                     selected_client = st.selectbox("**Select Account Name** 🚩", client_names)
+# #                     if selected_client != st.session_state['previous_clientOrg']:
+# #                         st.session_state['clientOrg'] = selected_client
+# #                         st.session_state['previous_clientOrg'] = selected_client
+
+# #                     if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# #                         st.info(f"You are viewing the {st.session_state['clientOrg']} Account")
+
+# #                 if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+# #                     alerts_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Alerts")
+# #                     escalation_matrix_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Escalation Matrix")
+
+# #                     st.subheader("Alerts")
+# #                     st.markdown(
+# #                         f"""
+# #                         <div style="
+# #                             border: 2px solid #ffcc00; 
+# #                             padding: 15px; 
+# #                             border-radius: 10px; 
+# #                             background-color: #fff7e6;">
+# #                             {alerts_content}
+# #                         </div>
+# #                         """,
+# #                         unsafe_allow_html=True
+# #                     )
+
+# #                     st.subheader("Escalation Matrix")
+# #                     st.markdown(
+# #                         f"""
+# #                         <div style="
+# #                             border: 2px solid #0066cc; 
+# #                             padding: 15px; 
+# #                             border-radius: 10px; 
+# #                             background-color: #e6f2ff;">
+# #                             {escalation_matrix_content}
+# #                         </div>
+# #                         """,
+# #                         unsafe_allow_html=True
+# #                     )
+# #                 else:
+# #                     st.subheader("Alerts")
+# #                     st.warning("Please select an account name to view the alerts.")
+
+# #                     st.subheader("Escalation Matrix")
+# #                     st.warning("Please select an account name to view the escalation matrix.")
+
+# #             st.sidebar.markdown("""<div style="height: 12vh;"></div>""", unsafe_allow_html=True)
+# #             st.sidebar.markdown(f'## Hello, *{st.session_state["name"]}*')
+# #             if st.sidebar.button("Logout", key="logout_button"):
+# #                 authenticator.logout('Logout', 'sidebar')
+# #                 for key in list(st.session_state.keys()):
+# #                     del st.session_state[key]
+# #                 st.experimental_rerun()
+
+# # elif st.session_state["authentication_status"] == False:
+# #     st.sidebar.error('Username/password is incorrect')
+# #     st.write("# Welcome to AI Support Assistant! 👋")
+# #     st.markdown(
+# #         """
+# #         Please enter your username and password to log in.
+# #         """
+# #     )
+# # elif st.session_state["authentication_status"] == None:
+# #     st.sidebar.warning('Please enter your username and password')
+# #     st.write("# Welcome to AI Support Assistant! 👋")
+# #     st.markdown(
+# #         """
+# #         Please enter your username and password to log in.
+# #         """
+# #     )
+
+
+# import os
+# from azure.storage.blob import BlobServiceClient
+# import streamlit as st
+# from yaml.loader import SafeLoader
+# import yaml
+# from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+# from langchain.chains import LLMChain
+# from langchain.prompts import PromptTemplate
+# from dotenv import load_dotenv
+# import streamlit_authenticator as stauth
+# from streamlit_navigation_bar import st_navbar
+# import logging
+# import pyotp
+# import qrcode
+# import io
+
+# from aisupport import run_chatbot, initialize_session_state, load_faiss_indexes
+
+# # Set page configuration
+# st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide", initial_sidebar_state="auto")
+
+# # Navbar at the top
+# styles = {
+#     "span": {
+#         "border-radius": "0.1rem",
+#         "color": "orange",
+#         "margin": "0 0.125rem",
+#         "padding": "0.400rem 0.400rem",
+#     },
+#     "active": {
+#         "background-color": "rgba(255, 255, 255, 0.25)",
+#         "color": "orange",  # Active text color to orange
+#         "text-decoration": "underline",  # Underline the active text
+#     },
+# }
+
+# selected = st_navbar(["Home", "Chatbot", "Alerts and Escalation Matrix"], 
+#                      selected=st.session_state.get('selected_option', 'Home'), 
+#                      styles=styles)
+
+# # Initialize session state
+# initialize_session_state()
+
+# # Load environment variables
+# load_dotenv()
+
+# # Load config from Azure Blob Storage
+# connection_string = os.getenv("BLOB_CONNECTION_STRING")
+# container_name = "itgluecopilot"
+# config_blob_name = "config/config.yaml"
+
+# # BlobServiceClient
+# blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+# container_client = blob_service_client.get_container_client(container_name)
+
+# # Load the YAML configuration file
+# blob_client = container_client.get_blob_client(config_blob_name)
+# blob_data = blob_client.download_blob().readall()
+# config = yaml.load(io.BytesIO(blob_data), Loader=SafeLoader)
+
+# authenticator = stauth.Authenticate(
+#     config['credentials'],
+#     config['cookie']['name'],
+#     config['cookie']['key'],
+#     config['cookie']['expiry_days'],
+# )
+
+# # Configure logging
+# logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler()])
+# logger = logging.getLogger(__name__)
+
+# # logger.info("Environment variables loaded")
+# logger.info("Environment variables loaded")
+
+
+# # Update session state with the selected option
+# st.session_state.selected_option = selected
+
+# with st.sidebar:
+#     st.image(r"./synoptek.png", width=275)
+
+# # Authentication for App
+# with st.sidebar:
+#     name, authentication_status, username = authenticator.login('Login', 'main')
+
+# def load_content_from_blob(blob_service_client, container_name, account_name, content_type):
+#     """Load specific content from a .txt file in Azure Blob Storage based on the account name and content type."""
+#     blob_name = f"Documents/{account_name}/{content_type}.txt"
+
+#     try:
+#         blob_client = blob_service_client.get_blob_client(container_name, blob_name)
+#         blob_data = blob_client.download_blob().readall().decode('utf-8')
+#         return blob_data
+#     except Exception as e:
+#         # logger.error(f"Error loading {content_type} for {account_name}: {e}")
+#         return f"{content_type} content not found for {account_name}. Please ensure the file exists."
+
+# if st.session_state["authentication_status"]:
+#     # Load account names dynamically from the blob
+#     account_names = ["Mitsui Chemicals America", "Northpoint Commercial Finance", "iBAS"]
+
+#     # Check for OTP Secret and Generate if Not Present
+#     user_data = config['credentials']['usernames'].get(username, {})
+#     otp_secret = user_data.get('otp_secret', "")
+
+#     if not otp_secret:
+#         otp_secret = pyotp.random_base32()
+#         config['credentials']['usernames'][username]['otp_secret'] = otp_secret
+#         blob_client.upload_blob(yaml.dump(config), overwrite=True)
+#         st.session_state['otp_setup_complete'] = False
+#         st.session_state['show_qr_code'] = True
+#         logger.info("Generated new OTP secret and set show_qr_code to True for user %s", username)
+#     else:
+#         st.session_state['otp_setup_complete'] = True
+
+#     # Ensure OTP secret is properly handled
+#     if otp_secret:
+#         totp = pyotp.TOTP(otp_secret)
+#         logger.info("Using OTP secret for user %s: %s", username, otp_secret)
+
+#         if not st.session_state['otp_verified']:
+#             if st.session_state['show_qr_code']:
+#                 st.title("Welcome to AI Support Assistant! 👋")
+#                 otp_uri = totp.provisioning_uri(name=user_data.get('email', ''), issuer_name="AI Support Assistant")
+#                 qr = qrcode.make(otp_uri)
+#                 qr = qr.resize((200, 200))
+
+#                 st.image(qr, caption="Scan this QR code with your authenticator app")
+
+#             st.title("AI Support Assistant")
+#             otp_input = st.text_input("Enter the OTP from your authenticator app", type="password")
+#             verify_button_clicked = st.button("Verify OTP")
+
+#             if verify_button_clicked:
+#                 if totp.verify(otp_input):
+#                     st.session_state['otp_verified'] = True
+#                     st.session_state['show_qr_code'] = False
+#                     blob_client.upload_blob(yaml.dump(config), overwrite=True)
+#                     st.experimental_rerun()
+#                 else:
+#                     st.error("Invalid OTP. Please try again.")
+#         else:
+#             # Load FAISS indexes
+#             account_indexes = {
+#                 "Mitsui Chemicals America": [
+#                     r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index1",
+#                     r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index2_ocr"
+#                 ],
+#                 "Northpoint Commercial Finance": [
+#                     r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
+#                     r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
+#                 ],
+#                 "iBAS": [
+#                     r"./Faiss_Index_IT Glue/Index_iBAS/index1",
+#                     r"./Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
+#                 ]
+#             }
+#             embeddings = AzureOpenAIEmbeddings(
+#                 azure_deployment='embeddings-aims',
+#                 openai_api_version="2024-04-01-preview",
+#                 azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+#                 api_key=os.getenv("OPENAI_API_KEY_AZURE")
+#             )
+#             faiss_indexes = load_faiss_indexes(account_indexes, embeddings)
+
+#             # --- APP ---
+#             if selected == "Home":
+#                 st.write("# Welcome to AI Support Assistant! 👋")
+#                 st.markdown(
+#                 """
+#                 Welcome to the AI Support Assistant! This tool is designed to streamline your support process by providing quick access to essential information and AI-powered assistance.
+
+#                 ### Getting Started:
+
+#                 - **☝️ Select Chatbot option from the navigation bar** to begin interacting with the AI Support Assistant.
+#                 - Make sure to select the correct account in the Alerts and Escalation Matrix tab to view the most relevant information.
+
+#                 ### How to Use the App:
+
+#                 **1. Chatbot Tab:**  
+#                 Navigate to the **Chatbot** tab to interact with our AI Assistant. You can ask questions or provide prompts related to your support needs, and the AI will generate detailed responses based on the context provided. This feature is ideal for quickly resolving issues or getting specific information.
+
+#                 **Steps:**
+#                 - Click on the **Chatbot** tab in the navigation bar and select an **Account**.
+#                 - Type your question or request in the input box at the bottom of the page.
+#                 - The AI will process your query and provide a response based on the available data.
+
+#                 **2. Alerts and Escalation Matrix Tab:**  
+#                 Visit the **Alerts and Escalation Matrix** tab to view critical alerts and the escalation matrix for specific accounts. This section provides important information about who to contact and the appropriate escalation procedures.
+
+#                 **Steps:**
+#                 - Click on the **Alerts and Escalation Matrix** tab in the navigation bar.
+#                 - Use the sidebar to select the account you wish to view.
+#                 - The page will display the relevant alerts and escalation matrix for the selected account.
+                
+#                 If you need assistance at any point, feel free to ask a question in the Chatbot tab.
+#                 """
+#                 )
+#             elif selected == 'Chatbot':
+#                 qa_chain = LLMChain(llm=AzureChatOpenAI(
+#                     model_name='gpt-4o',
+#                     openai_api_key=os.getenv("OPENAI_API_KEY_AZURE"),
+#                     azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+#                     openai_api_version="2024-04-01-preview",
+#                     temperature=0,
+#                     max_tokens=4000,
+#                     streaming=True,
+#                     verbose=True,
+#                     model_kwargs={'seed': 123}
+#                 ), prompt=PromptTemplate.from_template("""
+#                 ### Instruction ###
+#                 Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such. DO NOT PARAPHRASE ANYTHING AND GIVE EXACTLY AS ITS GIVEN IN THE DOCUMENT.
+
+#                 **Context:**
+#                 {context}
+
+#                 **Question:**
+#                 {question}
+
+#                 ### Guidelines ###
+#                 1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
+#                 2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
+#                 3. **Specificity**: Provide detailed and precise information directly related to the query.
+#                 4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
+#                 5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
+#                 6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
+
+#                 ### Example ###
+
+#                 #### IT Glue Response ####
+#                 [Your answer based on the given context]
+                                                       
+#                 ## External Information ##
+#                 []
+
+#                 #### Alerts and Escalation Matrix ####
+#                 [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
+                
+#                 ### Document Names ###
+#                 [List of documents and confidence scores (in %) with descending order.] 
+                
+#                 **Answer:**
+#                 """))
+#                 run_chatbot(faiss_indexes, blob_service_client, embeddings, qa_chain)
+            
+#             elif selected == 'Alerts and Escalation Matrix':
+#                 with st.sidebar:
+#                     client_names = ["Select an Account Name"] + account_names
+#                     selected_client = st.selectbox("**Select Account Name** 🚩", client_names)
+#                     if selected_client != st.session_state['previous_clientOrg']:
+#                         st.session_state['clientOrg'] = selected_client
+#                         st.session_state['previous_clientOrg'] = selected_client
+
+#                     if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+#                         st.info(f"You are viewing the {st.session_state['clientOrg']} Account")
+
+#                 if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+#                     alerts_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Alerts")
+#                     escalation_matrix_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Escalation Matrix")
+
+#                     st.subheader("Alerts")
+#                     st.markdown(
+#                         f"""
+#                         <div style="
+#                             border: 2px solid #ffcc00; 
+#                             padding: 15px; 
+#                             border-radius: 10px; 
+#                             background-color: #fff7e6;">
+#                             {alerts_content}
+#                         </div>
+#                         """,
+#                         unsafe_allow_html=True
+#                     )
+
+#                     st.subheader("Escalation Matrix")
+#                     st.markdown(
+#                         f"""
+#                         <div style="
+#                             border: 2px solid #0066cc; 
+#                             padding: 15px; 
+#                             border-radius: 10px; 
+#                             background-color: #e6f2ff;">
+#                             {escalation_matrix_content}
+#                         </div>
+#                         """,
+#                         unsafe_allow_html=True
+#                     )
+#                 else:
+#                     st.subheader("Alerts")
+#                     st.warning("Please select an account name to view the alerts.")
+
+#                     st.subheader("Escalation Matrix")
+#                     st.warning("Please select an account name to view the escalation matrix.")
+
+#             st.sidebar.markdown("""<div style="height: 12vh;"></div>""", unsafe_allow_html=True)
+#             st.sidebar.markdown(f'## Hello, *{st.session_state["name"]}*')
+#             if st.sidebar.button("Logout", key="logout_button"):
+#                 authenticator.logout('Logout', 'sidebar')
+#                 for key in list(st.session_state.keys()):
+#                     del st.session_state[key]
+#                 st.experimental_rerun()
+
+# elif st.session_state["authentication_status"] == False:
+#     st.sidebar.error('Username/password is incorrect')
+#     st.write("# Welcome to AI Support Assistant! 👋")
+#     st.markdown(
+#         """
+#         Please enter your username and password to log in.
+#         """
+#     )
+# elif st.session_state["authentication_status"] == None:
+#     st.sidebar.warning('Please enter your username and password')
+#     st.write("# Welcome to AI Support Assistant! 👋")
+#     st.markdown(
+#         """
+#         Please enter your username and password to log in.
+#         """
+#     )
+
+
+import os
+from azure.storage.blob import BlobServiceClient
 import streamlit as st
-import yaml
-import streamlit_authenticator as stauth
 from yaml.loader import SafeLoader
-from streamlit_extras.colored_header import colored_header
+import yaml
 from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
-from langchain_community.vectorstores import FAISS
-from langchain.memory import ConversationBufferMemory
-from langchain_community.chat_message_histories import StreamlitChatMessageHistory
-from langchain.callbacks.manager import collect_runs
 from dotenv import load_dotenv
-import os
-import base64
+import streamlit_authenticator as stauth
+from streamlit_navigation_bar import st_navbar
 import logging
 import pyotp
 import qrcode
 import io
-import uuid
-from azure.storage.blob import BlobServiceClient
-import pandas as pd
-from typing import Dict, List
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
-nltk.download('punkt')
-nltk.download('stopwords')
+from chatbot import run_chatbot, initialize_session_state, load_faiss_indexes
 
-# Set page config
-st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="centered")
+# Set page configuration
+st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide", initial_sidebar_state="auto")
 
-# Load environment variables
-azure_openai_api_key = os.getenv("OPENAI_API_KEY_AZURE")
-azure_endpoint = os.getenv("OPENAI_ENDPOINT_AZURE")
-load_dotenv()
+# Navbar at the top
+styles = {
+    "span": {
+        "border-radius": "0.1rem",
+        "color": "orange",
+        "margin": "0 0.125rem",
+        "padding": "0.400rem 0.400rem",
+    },
+    "active": {
+        "background-color": "rgba(255, 255, 255, 0.25)",
+        "color": "orange",  # Active text color to orange
+        "text-decoration": "underline",  # Underline the active text
+    },
+}
 
-# Constants
-API_VERSION = "2024-04-01-preview"
-MODEL_GPT4 = 'gpt-4-aims'
-MODEL_GPT4o = 'gpt-4o'
-MODEL_GPT35 = 'gpt-35-aims'
-TEMPERATURE = 0
-MAX_TOKENS_QA = 4000
-MAX_TOKENS_RESP = 8000
-MAX_TOKENS_4o = 4000
-CACHE_CLEAR_MSG = "Cleared app cache"
-ERROR_MSG = "Connection aborted."
-
-# Logging setup
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler()])
-logger = logging.getLogger(__name__)
+selected = st_navbar(["Home", "Chatbot", "Alerts and Escalation Matrix"], 
+                     selected=st.session_state.get('selected_option', 'Home'), 
+                     styles=styles)
 
 # Initialize session state
-def initialize_session_state():
-    session_vars = {
-        'clientOrg': '',
-        'messages': [{"role": "assistant", "content": "What do you want to query from AI Support Assistant?"}],
-        'default_messages': [{"role": "assistant", "content": "What do you want to query from AI Support Assistant?"}],
-        'previous_clientOrg': '',
-        'otp_setup_complete': False,
-        'otp_verified': False,
-        'show_qr_code': False,
-        'name': None,
-        'authentication_status': None,
-        'username': None,
-        'rating': 0,
-        'show_feedback_form': False,
-        'ai_response': '',
-        'user_prompt': '',
-        'conversation_history': [],
-        'selected_conversation': None,
-        'start_new_conversation': False,
-        'conversation_started': False,
-        'conversation_id': None
-    }
-    for var, default in session_vars.items():
-        if var not in st.session_state:
-            st.session_state[var] = default
-    logger.info("Initialized session state")
-
 initialize_session_state()
 
-def save_feedback(feedback_data):
-    feedback_container_name = "itgluecopilot"
-    feedback_blob_name = "feedback.csv"
-    feedback_blob_client = blob_service_client.get_blob_client(container=feedback_container_name, blob=feedback_blob_name)
-    fieldnames = ["conversation_id", "username", "account_name", "prompt", "conversation", "rating", "comments"]
+# Load environment variables
+load_dotenv()
 
-    try:
-        existing_feedback_data = feedback_blob_client.download_blob().readall().decode('utf-8')
-        existing_feedback_df = pd.read_csv(io.StringIO(existing_feedback_data))
-    except Exception:
-        existing_feedback_df = pd.DataFrame(columns=fieldnames)
-
-    new_feedback_df = pd.DataFrame([feedback_data])
-    updated_feedback_df = pd.concat([existing_feedback_df, new_feedback_df], ignore_index=True)
-
-    output = io.StringIO()
-    updated_feedback_df.to_csv(output, index=False)
-    feedback_blob_client.upload_blob(output.getvalue(), overwrite=True)
-
-def load_feedback():
-    feedback_blob_name = "feedback.csv"
-    feedback_blob_client = blob_service_client.get_blob_client(container="itgluecopilot", blob=feedback_blob_name)
-    try:
-        feedback_data = feedback_blob_client.download_blob().readall().decode('utf-8')
-        feedback_df = pd.read_csv(io.StringIO(feedback_data))
-        return feedback_df
-    except Exception:
-        return pd.DataFrame(columns=["conversation_id", "username", "account_name", "prompt", "conversation", "rating", "comments"])
-
-def analyze_feedback(feedback_df):
-    if (feedback_df.empty):
-        return "No feedback available."
-
-    avg_rating = feedback_df["rating"].mean()
-    common_issues = feedback_df["comments"].value_counts()
-
-    feedback_summary = f"Average Rating: {avg_rating}\nCommon Issues:\n"
-    for issue, count in common_issues.items():
-        feedback_summary += f"{issue}: {count} times\n"
-    
-    return feedback_summary
-
-def calculate_similarity_scores(feedback_df, user_prompt):
-    stop_words = set(stopwords.words('english'))
-    
-    def preprocess(text):
-        return ' '.join([word for word in word_tokenize(text.lower()) if word.isalpha() and word not in stop_words])
-    
-    # Preprocess user prompt and feedback entries
-    user_prompt_processed = preprocess(user_prompt)
-    feedback_df['combined_text'] = feedback_df.apply(lambda row: preprocess(row['conversation']) + ' ' + preprocess(row['comments']), axis=1)
-    
-    # Create TF-IDF vectors
-    tfidf_vectorizer = TfidfVectorizer()
-    tfidf_matrix = tfidf_vectorizer.fit_transform([user_prompt_processed] + feedback_df['combined_text'].tolist())
-    
-    # Calculate cosine similarity
-    cosine_similarities = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:]).flatten()
-    feedback_df['similarity'] = cosine_similarities * 100  # Convert to percentage
-    
-    # Log similarity scores
-    for index, row in feedback_df.iterrows():
-        logger.info(f"Feedback ID: {row['conversation_id']} - Similarity: {row['similarity']:.2f}%")
-    
-    return feedback_df
-
-def enhance_response_with_feedback(ai_response, feedback_df, similarity_threshold=48):
-    filtered_feedback = feedback_df[feedback_df['similarity'] >= similarity_threshold]
-    feedback_comments = filtered_feedback['comments'].tolist()
-    
-    if feedback_comments:
-        enhanced_response = f"{ai_response}\n\nBased on user feedback, considering the following points:\n" + "\n".join([f"- {comment}" for comment in feedback_comments])
-    else:
-        enhanced_response = ai_response
-    
-    return enhanced_response
-
+# Load config from Azure Blob Storage
 connection_string = os.getenv("BLOB_CONNECTION_STRING")
 container_name = "itgluecopilot"
-blob_name = "config/config.yaml"
+config_blob_name = "config/config.yaml"
 
+# BlobServiceClient
 blob_service_client = BlobServiceClient.from_connection_string(connection_string)
 container_client = blob_service_client.get_container_client(container_name)
-blob_client = container_client.get_blob_client(blob_name)
+
+# Load the YAML configuration file
+blob_client = container_client.get_blob_client(config_blob_name)
 blob_data = blob_client.download_blob().readall()
 config = yaml.load(io.BytesIO(blob_data), Loader=SafeLoader)
 
@@ -179,353 +2465,254 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days'],
 )
 
-if st.session_state["authentication_status"] is None:
-    st.title("AI Support Assistant")
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler()])
+logger = logging.getLogger(__name__)
 
-name, authentication_status, username = authenticator.login('Login', 'main')
+# logger.info("Environment variables loaded")
+logger.info("Environment variables loaded")
+
+
+# Update session state with the selected option
+st.session_state.selected_option = selected
+
+with st.sidebar:
+    st.image(r"./synoptek.png", width=275)
+
+# Authentication for App
+with st.sidebar:
+    name, authentication_status, username = authenticator.login('Login', 'main')
+
+def load_content_from_blob(blob_service_client, container_name, account_name, content_type):
+    """Load specific content from a .txt file in Azure Blob Storage based on the account name and content type."""
+    blob_name = f"Documents/{account_name}_{content_type}.txt"
+
+    try:
+        blob_client = blob_service_client.get_blob_client(container_name, blob_name)
+        blob_data = blob_client.download_blob().readall().decode('utf-8')
+        return blob_data
+    except Exception as e:
+        logger.error(f"Error loading {content_type} for {account_name}: {e}")
+        return f"{content_type} content not found for {account_name}. Please ensure the file exists."
 
 if st.session_state["authentication_status"]:
-    user_data = config['credentials']['usernames'][username]
+    # Load account names dynamically from the blob
+    account_names = ["Mitsui Chemicals America", "Northpoint Commercial Finance", "iBAS"]
+
+    # Check for OTP Secret and Generate if Not Present
+    user_data = config['credentials']['usernames'].get(username, {})
     otp_secret = user_data.get('otp_secret', "")
+
     if not otp_secret:
         otp_secret = pyotp.random_base32()
         config['credentials']['usernames'][username]['otp_secret'] = otp_secret
-        
-        updated_blob_data = yaml.dump(config)
-        blob_client.upload_blob(updated_blob_data, overwrite=True)
-
+        blob_client.upload_blob(yaml.dump(config), overwrite=True)
         st.session_state['otp_setup_complete'] = False
         st.session_state['show_qr_code'] = True
-        logger.info("Generated new OTP secret and set show_qr_code to True")
+        logger.info("Generated new OTP secret and set show_qr_code to True for user %s", username)
     else:
         st.session_state['otp_setup_complete'] = True
 
-    totp = pyotp.TOTP(otp_secret)
+    # Ensure OTP secret is properly handled
+    if otp_secret:
+        totp = pyotp.TOTP(otp_secret)
+        logger.info("Using OTP secret for user %s: %s", username, otp_secret)
 
-    if not st.session_state['otp_verified']:
-        if st.session_state['show_qr_code']:
-            logger.info("Displaying QR code for initial OTP setup")
-            otp_uri = totp.provisioning_uri(name=user_data['email'], issuer_name="AI Support Assistant")
-            qr = qrcode.make(otp_uri)
-            qr = qr.resize((200, 200))
+        if not st.session_state['otp_verified']:
+            if st.session_state['show_qr_code']:
+                st.title("Welcome to AI Support Assistant! 👋")
+                otp_uri = totp.provisioning_uri(name=user_data.get('email', ''), issuer_name="AI Support Assistant")
+                qr = qrcode.make(otp_uri)
+                qr = qr.resize((200, 200))
 
-            st.image(qr, caption="Scan this QR code with your authenticator app")
+                st.image(qr, caption="Scan this QR code with your authenticator app")
 
-        otp_input = st.text_input("Enter the OTP from your authenticator app", type="password")
-        verify_button_clicked = st.button("Verify OTP")
+            st.title("AI Support Assistant")
+            otp_input = st.text_input("Enter the OTP from your authenticator app", type="password")
+            verify_button_clicked = st.button("Verify OTP")
 
-        if verify_button_clicked:
-            if totp.verify(otp_input):
-                st.session_state['otp_verified'] = True
-                st.session_state['show_qr_code'] = False
-                st.experimental_rerun()
-            else:
-                st.error("Invalid OTP. Please try again.")
-    else:
-        embeddings = AzureOpenAIEmbeddings(
-            azure_deployment='embeddings-aims',
-            openai_api_version=API_VERSION,
-            azure_endpoint=azure_endpoint,
-            api_key=azure_openai_api_key
-        )
-
-        @st.cache_resource
-        def azure_openai_setup(api_key, endpoint):
-            try:
-                logger.info("Setting up Azure OpenAI")
-                llm_azure_qa = AzureChatOpenAI(
-                    model_name=MODEL_GPT4,
-                    openai_api_key=api_key,
-                    azure_endpoint=endpoint,
-                    openai_api_version=API_VERSION,
-                    temperature=TEMPERATURE,
-                    max_tokens=MAX_TOKENS_QA,
-                    model_kwargs={'seed': 123}
-                )
-                llm_azure_resp = AzureChatOpenAI(
-                    model_name=MODEL_GPT35,
-                    openai_api_key=api_key,
-                    azure_endpoint=endpoint,
-                    openai_api_version=API_VERSION,
-                    temperature=TEMPERATURE,
-                    max_tokens=MAX_TOKENS_RESP,
-                    model_kwargs={'seed': 123}
-                )
-                llm_azure_4o = AzureChatOpenAI(
-                    model_name=MODEL_GPT4o,
-                    openai_api_key=api_key,
-                    azure_endpoint=endpoint,
-                    openai_api_version=API_VERSION,
-                    temperature=TEMPERATURE,
-                    max_tokens=MAX_TOKENS_QA,
-                    model_kwargs={'seed': 123}
-                )
-                logger.info("Azure OpenAI setup completed")
-                return llm_azure_qa, llm_azure_resp, llm_azure_4o
-            except Exception as e:
-                logger.exception("Error setting up Azure OpenAI: %s", e)
-                st.error("Failed to set up Azure OpenAI. Please check the logs for details.")
-
-        azure_qa, azure_resp, azure_4o = azure_openai_setup(azure_openai_api_key, azure_endpoint)
-
-        prompt_template = """
-        ### Instruction ###
-        Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such.
-
-        **Context:**
-        {context}
-
-        **Question:**
-        {question}
-
-        ### Guidelines ###
-        1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
-        2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
-        3. **Specificity**: Provide detailed and precise information directly related to the query.
-        4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
-        5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
-        6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
-
-        ### Example ###
-
-        #### IT Glue Response ####
-        [Your answer based on the given context]
-
-        #### Alerts and Escalation Matrix ####
-        [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
-        
-        ### Document Names ###
-        [List of documents and confidence scores (in %) with descending order]
-        
-        **Answer:**
-
-        """
-
-        qa_chain = LLMChain(llm=azure_4o, prompt=PromptTemplate.from_template(prompt_template))
-
-        def load_faiss_indexes(account_indexes: Dict[str, List[str]]) -> Dict[str, List[FAISS]]:
-            indexes = {}
-            for account, paths in account_indexes.items():
-                indexes[account] = []
-                for path in paths:
-                    try:
-                        print(f"Loading index from: {path}")  # Debugging statement
-                        index = FAISS.load_local(
-                            folder_path=path,
-                            index_name='index',
-                            embeddings=embeddings,
-                            allow_dangerous_deserialization=True
-                        )
-                        indexes[account].append(index)
-                    except Exception as e:
-                        print(f"Error loading index from {path} for account {account}: {e}")
-            return indexes
-
-        account_indexes = {
-            "Mitsui Chemicals America": [
-                r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index1",
-                r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index2_ocr"
-            ],
-            "Northpoint Commercial Finance": [
-                r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
-                r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
-            ],
-            "iBAS": [
-                r"./Faiss_Index_IT Glue/Index_iBAS/index1",
-                r"./Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
-            ]
-        }
-
-        faiss_indexes = load_faiss_indexes(account_indexes)
-
-        def search_across_indexes(vector_stores: List[FAISS], query: str):
-            all_results = []
-            for store in vector_stores:
-                results = store.similarity_search(query, fetch_k= 12, k=3)
-                all_results.extend(results)
-            return all_results
-
-        with st.sidebar:
-            st.image(r"./synoptek.png", width=275)
-        colored_header(label="AI Support Assistant 🤖", description="\n", color_name="violet-70")
-
-        with st.sidebar:
-            client_names = ["Select an Account Name"] + list(faiss_indexes.keys())
-            selected_client = st.selectbox("**Select Account Name** 🚩", client_names)
-            if selected_client != st.session_state['previous_clientOrg']:
-                st.session_state['clientOrg'] = selected_client
-                st.session_state['previous_clientOrg'] = selected_client
-                if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
-                    st.session_state['vector_store'] = faiss_indexes[st.session_state['clientOrg']]
-                    st.session_state["messages"] = list(st.session_state["default_messages"])
-                    st.session_state["show_feedback_form"] = False
-                    st.info(f"You are now connected to {st.session_state['clientOrg']} Account!")
+            if verify_button_clicked:
+                if totp.verify(otp_input):
+                    st.session_state['otp_verified'] = True
+                    st.session_state['show_qr_code'] = False
+                    blob_client.upload_blob(yaml.dump(config), overwrite=True)
+                    st.experimental_rerun()
                 else:
-                    st.warning("Add client name above")
-
-        memory = ConversationBufferMemory(
-            chat_memory=StreamlitChatMessageHistory(key="langchain_messages"),
-            return_messages=True,
-            memory_key="chat_history"
-        )
-        
-        if st.sidebar.button("New Conversation"):
-            st.session_state["conversation_id"] = str(uuid.uuid4())
-            st.session_state["messages"] = list(st.session_state["default_messages"])
-            st.session_state["show_feedback_form"] = False
-            st.session_state["conversation_started"] = False
-            st.experimental_rerun()
-
-        def display_messages():
-            if "messages" in st.session_state:
-                for message in st.session_state.messages:
-                    with st.chat_message(message["role"]):
-                        st.write(message["content"])
-
-        display_messages()
-
-        user_prompt = st.chat_input("Type your message here")
-
-        if user_prompt:
-            st.session_state["user_prompt"] = user_prompt
-            st.session_state.messages.append({"role": "user", "content": user_prompt})
-            with st.chat_message("user"):
-                st.write(user_prompt)
-
-            input_dict = {"input": user_prompt}
-            try:
-                with collect_runs() as cb:
-                    if st.session_state.messages[-1]["role"] != "assistant":
-                        with st.chat_message("assistant"):
-                            with st.spinner("Generating answer..."):
-                                try:
-                                    vector_store = st.session_state.get('vector_store')
-                                    if not vector_store:
-                                        st.error("No Account Name Selected")
-                                    else:
-                                        relevant_docs = search_across_indexes(vector_store, user_prompt)
-                                        
-                                        context = ""
-                                        relevant_images = []
-
-                                        for d in relevant_docs:
-                                            if d.metadata['type'] == 'text':
-                                                context += '[text]' + d.metadata['original_content']
-                                            elif d.metadata['type'] == 'table':
-                                                context += '[table]' + d.metadata['original_content']
-                                            elif d.metadata['type'] == 'image':
-                                                context += '[image]' + d.page_content
-                                                relevant_images.append(d.metadata['original_content'])
-
-                                        conversation_history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state['messages']])
-                                        context = conversation_history + "\n\n" + context
-
-                                        feedback_df = load_feedback()
-                                        feedback_df = calculate_similarity_scores(feedback_df, user_prompt)
-                                        feedback_summary = analyze_feedback(feedback_df)
-                                        relevant_feedback_comments = enhance_response_with_feedback("", feedback_df, similarity_threshold=48)
-
-                                        initial_response = qa_chain.run({'context': context, 'question': user_prompt})
-                                        st.session_state["ai_response"] = enhance_response_with_feedback(initial_response, feedback_df, similarity_threshold=48)
-
-                                        st.write(st.session_state["ai_response"])
-                                        logger.info("AI response generated successfully.")
-
-                                        if relevant_images:
-                                            st.subheader("Relevant Images:")
-                                            cols = st.columns(len(relevant_images))
-                                            for idx, img in enumerate(relevant_images):
-                                                if isinstance(img, str):
-                                                    try:
-                                                        img_bytes = base64.b64decode(img)
-                                                        cols[idx].image(img_bytes, use_column_width=True, width=270)
-                                                    except Exception as e:
-                                                        logger.exception("Error decoding and displaying image: %s", e)
-                                                        st.error("Error decoding and displaying image. Please try again.")
-                                except Exception as e:
-                                    logger.exception("Error during processing: %s", e)
-                                    st.error(ERROR_MSG) 
-                new_ai_message = {"role": "assistant", "content": st.session_state["ai_response"]}
-                st.session_state.messages.append(new_ai_message)
-                if cb.traced_runs:
-                    st.session_state.run_id = cb.traced_runs[0].id
-                memory.save_context(input_dict, {"output": st.session_state["ai_response"]})
-                logger.info("Session state updated and context saved successfully.")
-                st.session_state["show_feedback_form"] = True
-
-                if not st.session_state["conversation_started"]:
-                    title = st.session_state["messages"][1]["content"][:30] + '...' if len(st.session_state["messages"][1]["content"]) > 30 else st.session_state["messages"][1]["content"]
-                    st.session_state["conversation_history"].insert(0, {
-                        "title": title,
-                        "messages": st.session_state["messages"],
-                        "conversation_id": st.session_state["conversation_id"]
-                    })
-                    st.session_state["conversation_started"] = True
-
-                    if len(st.session_state["conversation_history"]) > 5:
-                        st.session_state["conversation_history"] = st.session_state["conversation_history"][:5]
-            except Exception as e:
-                logger.exception("Error during the collection of runs or session state update: %s", e)
-                st.error(ERROR_MSG)
-        
-        if st.session_state["show_feedback_form"]:
-            st.subheader("Feedback")
-
-            rating_options = {
-                1: "Inaccurate",
-                2: "Partially Accurate",
-                3: "Accurate"
+                    st.error("Invalid OTP. Please try again.")
+        else:
+            # Load FAISS indexes
+            account_indexes = {
+                "Mitsui Chemicals America": [
+                    r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index1",
+                    r"./Faiss_Index_IT Glue/Index_Mitsui Chemicals America/index2_ocr"
+                ],
+                "Northpoint Commercial Finance": [
+                    r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index1",
+                    r"./Faiss_Index_IT Glue/Index_Northpoint Commercial Finance/index2_ocr"
+                ],
+                "iBAS": [
+                    r"./Faiss_Index_IT Glue/Index_iBAS/index1",
+                    r"./Faiss_Index_IT Glue/Index_iBAS/index2_ocr"
+                ]
             }
+            embeddings = AzureOpenAIEmbeddings(
+                azure_deployment='embeddings-aims',
+                openai_api_version="2024-04-01-preview",
+                azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+                api_key=os.getenv("OPENAI_API_KEY_AZURE")
+            )
+            faiss_indexes = load_faiss_indexes(account_indexes, embeddings)
 
-            cols = st.columns(len(rating_options))
-            for idx, (rating, label) in enumerate(rating_options.items()):
-                if cols[idx].button(label):
-                    st.session_state["rating"] = rating
+            # --- APP ---
+            if selected == "Home":
+                st.write("# Welcome to AI Support Assistant! 👋")
+                st.markdown(
+                """
+                Welcome to the AI Support Assistant! This tool is designed to streamline your support process by providing quick access to essential information and AI-powered assistance.
 
-            st.write(f"Selected Rating: {st.session_state['rating']}")
+                ### Getting Started:
 
-            comments = st.text_area("Additional comments")
-            feedback_submitted = st.button("Submit Feedback")
+                - **☝️ Select Chatbot option from the navigation bar** to begin interacting with the AI Support Assistant.
+                - Make sure to select the correct account in the Alerts and Escalation Matrix tab to view the most relevant information.
 
-            if feedback_submitted:
-                if not comments:
-                    comments = "No comments"  # Set default value if comments are empty
-                feedback_data = {
-                    "conversation_id": st.session_state["conversation_id"],
-                    "username": username,
-                    "account_name": st.session_state["clientOrg"],
-                    "conversation": st.session_state["messages"],
-                    "prompt": st.session_state["user_prompt"],
-                    "rating": st.session_state["rating"],  # Use the selected rating
-                    "comments": comments  # Use the default value if comments were empty
-                }
-                save_feedback(feedback_data)
-                st.session_state["show_feedback_form"] = False
-                st.session_state["rating"] = 0
-                st.session_state["user_prompt"] = ""
-                st.session_state["ai_response"] = ""
-                st.success("Feedback submitted successfully")
+                ### How to Use the App:
 
-        st.sidebar.markdown("""<div style="height: 4vh;"></div>""", unsafe_allow_html=True)
-        st.sidebar.subheader("Conversation History")
-        for i, conversation in enumerate(st.session_state["conversation_history"]):
-            if st.sidebar.button(conversation["title"], key=f"conversation_{i}"):
-                st.session_state["selected_conversation"] = conversation
-                st.session_state["messages"] = conversation["messages"]
-                st.session_state["conversation_id"] = conversation["conversation_id"]
-                st.session_state["show_feedback_form"] = False
-                st.experimental_rerun()
+                **1. Chatbot Tab:**  
+                Navigate to the **Chatbot** tab to interact with our AI Assistant. You can ask questions or provide prompts related to your support needs, and the AI will generate detailed responses based on the context provided. This feature is ideal for quickly resolving issues or getting specific information.
 
-        with st.sidebar:
-            st.sidebar.markdown("""<div style="height: 16vh;"></div>""", unsafe_allow_html=True)
+                **Steps:**
+                - Click on the **Chatbot** tab in the navigation bar and select an **Account**.
+                - Type your question or request in the input box at the bottom of the page.
+                - The AI will process your query and provide a response based on the available data.
+
+                **2. Alerts and Escalation Matrix Tab:**  
+                Visit the **Alerts and Escalation Matrix** tab to view critical alerts and the escalation matrix for specific accounts. This section provides important information about who to contact and the appropriate escalation procedures.
+
+                **Steps:**
+                - Click on the **Alerts and Escalation Matrix** tab in the navigation bar.
+                - Use the sidebar to select the account you wish to view.
+                - The page will display the relevant alerts and escalation matrix for the selected account.
+                
+                If you need assistance at any point, feel free to ask a question in the Chatbot tab.
+                """
+                )
+            elif selected == 'Chatbot':
+                qa_chain = LLMChain(llm=AzureChatOpenAI(
+                    model_name='gpt-4o',
+                    openai_api_key=os.getenv("OPENAI_API_KEY_AZURE"),
+                    azure_endpoint=os.getenv("OPENAI_ENDPOINT_AZURE"),
+                    openai_api_version="2024-04-01-preview",
+                    temperature=0,
+                    max_tokens=4000,
+                    streaming=True,
+                    verbose=True,
+                    model_kwargs={'seed': 123}
+                ), prompt=PromptTemplate.from_template("""
+                ### Instruction ###
+                Given the context below, provide a detailed and accurate answer to the question. Base your response primarily on the provided information. Only include additional context from external sources if absolutely necessary, and clearly identify it as such. DO NOT PARAPHRASE ANYTHING AND GIVE EXACTLY AS ITS GIVEN IN THE DOCUMENT.
+
+                **Context:**
+                {context}
+
+                **Question:**
+                {question}
+
+                ### Guidelines ###
+                1. **Primary Source**: Base your response primarily on the provided context and give the process as exact as given in the document.
+                2. **External Information**: If additional information is needed, clearly label it as "External Information" and keep it to a minimum.
+                3. **Specificity**: Provide detailed and precise information directly related to the query.
+                4. **Separation of Information**: Use headings such as "IT Glue Response" and "External Information" to differentiate the sources.
+                5. **Insufficient Context**: If the provided context does not contain enough information to answer the question, state: "The provided context does not contain enough information to answer the question."
+                6. **Document References**: List the names of all documents accessed, along with a confidence score for each document based on its relevance. 
+
+                ### Example ###
+
+                #### IT Glue Response ####
+                [Your answer based on the given context]
+                                                       
+                ## External Information ##
+                []
+
+                #### Alerts and Escalation Matrix ####
+                [Your answer after referring to the specific escalation matrix file for the given account name to determine who should be alerted or to whom the issue should be escalated. Ensure that the appropriate contacts are notified based on the escalation matrix provided in the document.] 
+                
+                ### Document Names ###
+                [List of documents and confidence scores (in %) with descending order.] 
+                
+                **Answer:**
+                """))
+                run_chatbot(faiss_indexes, blob_service_client, embeddings, qa_chain)
+            
+            elif selected == 'Alerts and Escalation Matrix':
+                with st.sidebar:
+                    client_names = ["Select an Account Name"] + account_names
+                    selected_client = st.selectbox("**Select Account Name** 🚩", client_names)
+                    if selected_client != st.session_state['previous_clientOrg']:
+                        st.session_state['clientOrg'] = selected_client
+                        st.session_state['previous_clientOrg'] = selected_client
+
+                    if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+                        st.info(f"You are viewing the {st.session_state['clientOrg']} Account")
+
+                if st.session_state['clientOrg'] and st.session_state['clientOrg'] != "Select an Account Name":
+                    alerts_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Alerts")
+                    escalation_matrix_content = load_content_from_blob(blob_service_client, container_name, st.session_state['clientOrg'], "Escalation Matrix")
+
+                    st.subheader("Alerts")
+                    st.markdown(
+                        f"""
+                        <div style="
+                            border: 2px solid #ffcc00; 
+                            padding: 15px; 
+                            border-radius: 10px; 
+                            background-color: #fff7e6;">
+                            {alerts_content}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                    st.subheader("Escalation Matrix")
+                    st.markdown(
+                        f"""
+                        <div style="
+                            border: 2px solid #0066cc; 
+                            padding: 15px; 
+                            border-radius: 10px; 
+                            background-color: #e6f2ff;">
+                            {escalation_matrix_content}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.subheader("Alerts")
+                    st.warning("Please select an account name to view the alerts.")
+
+                    st.subheader("Escalation Matrix")
+                    st.warning("Please select an account name to view the escalation matrix.")
+
+            st.sidebar.markdown("""<div style="height: 12vh;"></div>""", unsafe_allow_html=True)
             st.sidebar.markdown(f'## Hello, *{st.session_state["name"]}*')
-            if st.button("Logout", key="logout_button"):
+            if st.sidebar.button("Logout", key="logout_button"):
                 authenticator.logout('Logout', 'sidebar')
-                st.session_state['otp_verified'] = False
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
                 st.experimental_rerun()
 
-else:
-    if st.session_state["authentication_status"] == False:
-        st.error('Username/password is incorrect')
-    elif st.session_state["authentication_status"] == None:
-        st.warning('Please enter your username and password')
+elif st.session_state["authentication_status"] == False:
+    st.sidebar.error('Username/password is incorrect')
+    st.write("# Welcome to AI Support Assistant! 👋")
+    st.markdown(
+        """
+        Please enter your username and password to log in.
+        """
+    )
+elif st.session_state["authentication_status"] == None:
+    st.sidebar.warning('Please enter your username and password')
+    st.write("# Welcome to AI Support Assistant! 👋")
+    st.markdown(
+        """
+        Please enter your username and password to log in.
+        """
+    )
