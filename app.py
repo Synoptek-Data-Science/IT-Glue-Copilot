@@ -2698,6 +2698,7 @@ if st.session_state["authentication_status"]:
                 authenticator.logout('Logout', 'sidebar')
                 for key in list(st.session_state.keys()):
                     del st.session_state[key]
+                st.session_state['authentication_status'] = None
                 st.experimental_rerun()
 
 elif st.session_state["authentication_status"] == False:
