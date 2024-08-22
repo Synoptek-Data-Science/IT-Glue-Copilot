@@ -2413,8 +2413,13 @@ import logging
 import pyotp
 import qrcode
 import io
+import nltk
 
 from chatbot import run_chatbot, initialize_session_state, load_faiss_indexes
+
+#Nltk packages download
+nltk.download('punkt')
+nltk.download('stopwords')
 
 # Set page configuration
 st.set_page_config(page_title="AI Support Assistant", page_icon="🤖", layout="wide", initial_sidebar_state="auto")
