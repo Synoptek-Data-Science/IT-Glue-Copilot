@@ -6,3 +6,5 @@ generate_hash.py
 __pycache__
 app2.py
 local_faiss_indexes
+account_data
+config2.yaml
