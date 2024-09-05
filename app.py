@@ -90,7 +90,7 @@ import nltk
 
 from chatbot import run_chatbot, initialize_session_state, load_faiss_indexes
 
-# Nltk packages download
+
 nltk.download('punkt')
 nltk.download('stopwords')
 
