@@ -125,7 +125,7 @@ load_dotenv()
 # Load config from Azure Blob Storage
 connection_string = os.getenv("BLOB_CONNECTION_STRING")
 container_name = "itgluecopilot"
-config_blob_name = "config/config2.yaml"
+config_blob_name = "config/config.yaml"
 
 # BlobServiceClient
 blob_service_client = BlobServiceClient.from_connection_string(connection_string)
